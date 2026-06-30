@@ -451,11 +451,20 @@ input, textarea {
 .typing-indicator {
   display: flex; align-items: center; gap: 4px;
 }
+#typingIndicator .msg-content {
+  max-width: none;
+}
 #typingIndicator .msg-bubble {
-  padding: 8px 14px;
+  padding: 6px 12px;
+  border-radius: 20px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.06);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  width: fit-content;
 }
 .thinking-label {
-  font-size: 12px;
+  font-size: 11px;
   color: var(--text-dim);
   background: linear-gradient(90deg, var(--text-dim) 0%, var(--title) 50%, var(--text-dim) 100%);
   background-size: 200% 100%;
@@ -489,8 +498,8 @@ input, textarea {
   gap: 6px;
 }
 .msg-row.agent.thinking .msg-avatar {
-  width: 26px; height: 26px;
-  font-size: 13px;
+  width: 22px; height: 22px;
+  font-size: 11px;
   animation: avatarPulse 2s ease-in-out infinite;
 }
 @keyframes avatarPulse {
