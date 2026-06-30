@@ -583,10 +583,11 @@ input, textarea {
       <div class="settings-group">
         <label>模型</label>
         <select class="settings-select" id="settingModel">
-          <option value="doubao-lite-128k">豆包 Lite (128K)</option>
-          <option value="doubao-pro-128k">豆包 Pro (128K)</option>
+          <option value="deepseek-v4-flash">DeepSeek V4 Flash</option>
           <option value="deepseek-chat">DeepSeek V3</option>
           <option value="deepseek-reasoner">DeepSeek R1</option>
+          <option value="doubao-lite-128k">豆包 Lite (128K)</option>
+          <option value="doubao-pro-128k">豆包 Pro (128K)</option>
         </select>
       </div>
 
@@ -616,8 +617,8 @@ input, textarea {
 const SettingsManager = {
   DEFAULTS: {
     apiKey: '',
-    baseURL: 'https://ark.cn-beijing.volces.com/api/v3',
-    model: 'doubao-lite-128k',
+    baseURL: 'https://api.deepseek.com',
+    model: 'deepseek-v4-flash',
     temperature: 0.7,
   },
 
@@ -1713,7 +1714,7 @@ const UIController = {
     const s = SettingsManager.getAll();
     document.getElementById('settingApiKey').value = s.apiKey || '';
     document.getElementById('settingBaseURL').value = s.baseURL || '';
-    document.getElementById('settingModel').value = s.model || 'doubao-lite-128k';
+    document.getElementById('settingModel').value = s.model || 'deepseek-v4-flash';
     document.getElementById('settingTemperature').value = s.temperature ?? 0.7;
     this._updateApiStatus();
   },
