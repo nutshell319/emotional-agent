@@ -833,6 +833,15 @@ input, textarea {
 
 <script>
 /* ========================================
+   Utils
+   ======================================== */
+/** 过滤Markdown符号：移除** * # 等 */
+function stripMarkdown(text) {
+  if (!text) return text;
+  return text.replace(/\*\*/g, '').replace(/(?<!\*)\*(?!\*)/g, '').replace(/^#+\s/gm, '');
+}
+
+/* ========================================
    SettingsManager — API配置的读写
    ======================================== */
 const SettingsManager = {
@@ -1445,7 +1454,7 @@ const ChatManager = {
         if (chat) {
           chat.messages.push({
             role: 'assistant',
-            content: fullResponse,
+            content: stripMarkdown(fullResponse),
             timestamp: new Date().toISOString(),
           });
           StorageManager.saveChat(chat);
@@ -1459,7 +1468,7 @@ const ChatManager = {
           if (chat) {
             chat.messages.push({
               role: 'assistant',
-              content: fullResponse + '\n\n[响应中断]',
+              content: stripMarkdown(fullResponse) + '\n\n[响应中断]',
               timestamp: new Date().toISOString(),
             });
             StorageManager.saveChat(chat);
@@ -1497,7 +1506,7 @@ const ChatManager = {
           if (chat) {
             chat.messages.push({
               role: 'assistant',
-              content: fullResponse,
+              content: stripMarkdown(fullResponse),
               timestamp: new Date().toISOString(),
             });
             StorageManager.saveChat(chat);
@@ -1838,7 +1847,7 @@ const UIController = {
     row.innerHTML = `
       <div class="msg-avatar"></div>
       <div class="msg-content">
-        <div class="msg-bubble">${this._escapeHtml(msg.content)}</div>
+        <div class="msg-bubble">${this._escapeHtml(this._stripMarkdown(msg.content))}</div>
         <div class="msg-time">${this._formatTime(msg.timestamp)}</div>
       </div>`;
     return row;
@@ -1850,7 +1859,7 @@ const UIController = {
     row.innerHTML = `
       <div class="msg-avatar">👧🏻</div>
       <div class="msg-content">
-        <div class="msg-bubble">${this._escapeHtml(msg.content)}</div>
+        <div class="msg-bubble">${this._escapeHtml(this._stripMarkdown(msg.content))}</div>
         <div class="msg-time">${this._formatTime(msg.timestamp)}</div>
         ${wasInterrupted ? '<span class="continue-hint" data-action="continue">点击继续生成 →</span>' : ''}
       </div>`;
@@ -1922,7 +1931,7 @@ const UIController = {
           this._streamingBubble = row.querySelector('.msg-bubble');
           this._dom.chatMessages.appendChild(row);
         }
-        this._streamingBubble.textContent += chunk;
+        this._streamingBubble.textContent += this._stripMarkdown(chunk);
         this._scrollToBottom();
       },
       onAgentDone: () => {
@@ -2013,6 +2022,11 @@ const UIController = {
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
+  },
+
+  /** 过滤Markdown符号：移除** * # 等 */
+  _stripMarkdown(text) {
+    return stripMarkdown(text);
   },
 
   _formatTime(isoString) {
