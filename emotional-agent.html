@@ -123,6 +123,172 @@ input, textarea {
 
 <script>
 /* ========================================
+   SettingsManager — API配置的读写
+   ======================================== */
+const SettingsManager = {
+  DEFAULTS: {
+    apiKey: '',
+    baseURL: 'https://ark.cn-beijing.volces.com/api/v3',
+    model: 'doubao-lite-128k',
+    temperature: 0.7,
+  },
+
+  _cache: null,
+
+  /** 获取当前设置（含默认值fallback） */
+  getAll() {
+    if (this._cache) return this._cache;
+    try {
+      const raw = localStorage.getItem('emotion-agent:settings');
+      if (raw) {
+        this._cache = { ...this.DEFAULTS, ...JSON.parse(raw) };
+      } else {
+        this._cache = { ...this.DEFAULTS };
+      }
+    } catch (e) {
+      console.error('[SettingsManager] 读取失败:', e);
+      this._cache = { ...this.DEFAULTS };
+    }
+    return this._cache;
+  },
+
+  /** 更新单个设置项 */
+  set(key, value) {
+    const all = this.getAll();
+    all[key] = value;
+    this._save(all);
+  },
+
+  /** 批量更新设置 */
+  update(partial) {
+    const all = { ...this.getAll(), ...partial };
+    this._save(all);
+  },
+
+  /** 验证API配置是否完整 */
+  isValid() {
+    const s = this.getAll();
+    return !!s.apiKey && !!s.baseURL && !!s.model;
+  },
+
+  _save(all) {
+    try {
+      localStorage.setItem('emotion-agent:settings', JSON.stringify(all));
+      this._cache = all;
+    } catch (e) {
+      console.error('[SettingsManager] 保存失败:', e);
+      throw e;
+    }
+  },
+};
+
+/* ========================================
+   StorageManager — 对话数据的读写与导出/导入
+   ======================================== */
+const StorageManager = {
+  CHATS_KEY: 'emotion-agent:chats',
+
+  /** 获取所有会话列表（按更新时间倒序） */
+  getAllChats() {
+    try {
+      const raw = localStorage.getItem(this.CHATS_KEY);
+      if (!raw) return [];
+      return JSON.parse(raw);
+    } catch (e) {
+      console.error('[StorageManager] 读取会话失败:', e);
+      return [];
+    }
+  },
+
+  /** 保存全部会话 */
+  saveAllChats(chats) {
+    try {
+      const json = JSON.stringify(chats);
+      localStorage.setItem(this.CHATS_KEY, json);
+    } catch (e) {
+      if (e.name === 'QuotaExceededError') {
+        throw new Error('STORAGE_FULL');
+      }
+      throw e;
+    }
+  },
+
+  /** 获取单个会话 */
+  getChat(chatId) {
+    const chats = this.getAllChats();
+    return chats.find(c => c.id === chatId) || null;
+  },
+
+  /** 保存/更新单个会话（存在则更新，不存在则追加） */
+  saveChat(chat) {
+    const chats = this.getAllChats();
+    const idx = chats.findIndex(c => c.id === chat.id);
+    chat.updatedAt = new Date().toISOString();
+    if (idx >= 0) {
+      chats[idx] = chat;
+    } else {
+      chats.unshift(chat);
+    }
+    this.saveAllChats(chats);
+  },
+
+  /** 删除单个会话 */
+  deleteChat(chatId) {
+    const chats = this.getAllChats().filter(c => c.id !== chatId);
+    this.saveAllChats(chats);
+  },
+
+  /** 导出为JSON文件下载 */
+  exportJSON() {
+    const data = {
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      chats: this.getAllChats(),
+      settings: SettingsManager.getAll(),
+    };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `小暖-对话备份-${new Date().toISOString().slice(0,10)}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  },
+
+  /** 从JSON文件导入，按ID去重合并 */
+  importJSON(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const data = JSON.parse(e.target.result);
+          if (!data.version || !Array.isArray(data.chats)) {
+            throw new Error('INVALID_FORMAT');
+          }
+          const existing = this.getAllChats();
+          const existingIds = new Set(existing.map(c => c.id));
+          const newChats = data.chats.filter(c => !existingIds.has(c.id));
+          const merged = [...newChats, ...existing];
+          this.saveAllChats(merged);
+          if (data.settings) {
+            SettingsManager.update(data.settings);
+          }
+          resolve(newChats.length);
+        } catch (err) {
+          reject(err.message === 'INVALID_FORMAT'
+            ? new Error('文件格式不正确，请选择有效的对话备份文件')
+            : err);
+        }
+      };
+      reader.onerror = () => reject(new Error('文件读取失败'));
+      reader.readAsText(file);
+    });
+  },
+};
+
+/* ========================================
    INIT — 页面加载入口（后续任务填充）
    ======================================== */
 document.addEventListener('DOMContentLoaded', () => {
