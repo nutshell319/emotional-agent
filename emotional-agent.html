@@ -564,6 +564,198 @@ const ContextCompressor = {
 };
 
 /* ========================================
+   ChatManager — 会话CRUD + 消息流控
+   ======================================== */
+const ChatManager = {
+  _currentChatId: null,
+
+  /** 创建新会话 */
+  createChat() {
+    const chat = {
+      id: crypto.randomUUID ? crypto.randomUUID() : 'id-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8),
+      title: '新对话',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      messages: [],
+      summary: null,
+    };
+    StorageManager.saveChat(chat);
+    this._currentChatId = chat.id;
+    return chat;
+  },
+
+  /** 获取当前会话 */
+  getCurrentChat() {
+    if (!this._currentChatId) return null;
+    return StorageManager.getChat(this._currentChatId);
+  },
+
+  /** 切换到指定会话 */
+  switchChat(chatId) {
+    const chat = StorageManager.getChat(chatId);
+    if (chat) {
+      this._currentChatId = chatId;
+    }
+    return chat;
+  },
+
+  /** 构建发送给API的消息列表 */
+  async buildContext() {
+    const chat = this.getCurrentChat();
+    if (!chat) return [{ role: 'system', content: SYSTEM_PROMPT }];
+
+    const history = chat.messages; // 不含system prompt
+
+    // 判断是否需要压缩
+    if (ContextCompressor.needsCompression(history)) {
+      const result = await ContextCompressor.compress(history, chat.summary);
+      chat.messages = result.messages;
+      chat.summary = result.summary;
+      StorageManager.saveChat(chat);
+    }
+
+    // 拼接：system prompt + summary提示 + 历史消息
+    const context = [{ role: 'system', content: SYSTEM_PROMPT }];
+
+    if (chat.summary) {
+      context[0].content += `\n\n[历史背景：${chat.summary}]`;
+    }
+
+    return context.concat(chat.messages);
+  },
+
+  /** 发送用户消息并获取流式回复 */
+  async sendMessage(userInput, uiCallbacks) {
+    const { onUserMsg, onAgentChunk, onAgentDone, onError, onReject } = uiCallbacks;
+
+    // 1. 领域预检
+    const domainCheck = SafetyGuard.checkDomain(userInput);
+    if (!domainCheck.allowed) {
+      // 本地拒绝，渲染拒绝卡片（不计入消息历史）
+      onReject(domainCheck.reason);
+      return;
+    }
+
+    // 2. 危机检测
+    const crisisResponse = SafetyGuard.checkCrisis(userInput);
+    if (crisisResponse) {
+      // 触发安全模式 — 同时添加用户消息和安全回复
+      const chat = this._ensureChat();
+      chat.messages.push(
+        { role: 'user', content: userInput, timestamp: new Date().toISOString() },
+        { role: 'assistant', content: crisisResponse, timestamp: new Date().toISOString() }
+      );
+      StorageManager.saveChat(chat);
+      onAgentChunk(crisisResponse);
+      onAgentDone();
+      return;
+    }
+
+    // 3. 正常流程
+    const chat = this._ensureChat();
+
+    // 添加用户消息
+    const userMsg = { role: 'user', content: userInput, timestamp: new Date().toISOString() };
+    chat.messages.push(userMsg);
+    onUserMsg(userMsg);
+
+    // 自动标题：首条消息作为标题
+    if (chat.messages.length === 1) {
+      chat.title = userInput.length > 20 ? userInput.slice(0, 20) + '...' : userInput;
+    }
+
+    StorageManager.saveChat(chat);
+
+    // 4. 构建上下文并发起请求
+    const context = await this.buildContext();
+
+    let fullResponse = '';
+    DeepSeekClient.streamChat(context, {
+      onChunk: (text) => {
+        fullResponse += text;
+        onAgentChunk(text);
+      },
+      onDone: () => {
+        // 保存assistant消息
+        const chat = this.getCurrentChat();
+        if (chat) {
+          chat.messages.push({
+            role: 'assistant',
+            content: fullResponse,
+            timestamp: new Date().toISOString(),
+          });
+          StorageManager.saveChat(chat);
+        }
+        onAgentDone();
+      },
+      onError: (err) => {
+        // 保存已接收的部分
+        if (fullResponse) {
+          const chat = this.getCurrentChat();
+          if (chat) {
+            chat.messages.push({
+              role: 'assistant',
+              content: fullResponse + '\n\n[响应中断]',
+              timestamp: new Date().toISOString(),
+            });
+            StorageManager.saveChat(chat);
+          }
+        }
+        onError(err);
+      },
+    });
+  },
+
+  /** 重试最后一条消息（补全中断的响应） */
+  async retryLast() {
+    const chat = this.getCurrentChat();
+    if (!chat || chat.messages.length < 2) return;
+
+    const lastAssistant = chat.messages[chat.messages.length - 1];
+    if (lastAssistant.role !== 'assistant') return;
+
+    // 移除最后一条assistant消息，重新生成
+    chat.messages.pop();
+    StorageManager.saveChat(chat);
+
+    // 重新调用sendMessage但跳过添加用户消息
+    const context = await this.buildContext();
+    let fullResponse = '';
+
+    return new Promise((resolve, reject) => {
+      DeepSeekClient.streamChat(context, {
+        onChunk: (text) => {
+          fullResponse += text;
+          UIController.appendToLastBubble(text);
+        },
+        onDone: () => {
+          const chat = this.getCurrentChat();
+          if (chat) {
+            chat.messages.push({
+              role: 'assistant',
+              content: fullResponse,
+              timestamp: new Date().toISOString(),
+            });
+            StorageManager.saveChat(chat);
+          }
+          resolve(fullResponse);
+        },
+        onError: reject,
+      });
+    });
+  },
+
+  /** 确保存在当前会话（没有则新建） */
+  _ensureChat() {
+    let chat = this.getCurrentChat();
+    if (!chat) {
+      chat = this.createChat();
+    }
+    return chat;
+  },
+};
+
+/* ========================================
    INIT — 页面加载入口（后续任务填充）
    ======================================== */
 document.addEventListener('DOMContentLoaded', () => {
