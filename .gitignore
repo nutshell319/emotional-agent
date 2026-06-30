@@ -1,0 +1,25 @@
+# Claude runtime
+.claude/
+.claudian/
+
+# IDE
+.vs/
+.vscode/
+*.suo
+*.user
+
+# OS
+Thumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Dependencies
+node_modules/
+
+# Env
+.env
+.env.local
+
+# Backup
+*.bak
+*~
