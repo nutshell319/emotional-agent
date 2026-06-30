@@ -524,6 +524,114 @@ input, textarea {
 .status-badge.warn { background: rgba(255,152,0,0.1); color: #ffb74d; }
 
 .file-input-hidden { display: none; }
+
+/* ========================================
+   Profile Card
+   ======================================== */
+.profile-area { flex-shrink: 0; }
+.profile-card {
+  margin: 0 20px 8px 20px;
+  padding: 12px 16px;
+  border-radius: 10px;
+  border: 1px solid rgba(185,142,255,0.12);
+  background: rgba(185,142,255,0.03);
+  animation: slideIn 0.35s ease;
+}
+.profile-card-header {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 6px;
+}
+.profile-card-title {
+  font-size: 11px; color: var(--title);
+  letter-spacing: 1px;
+  display: flex; align-items: center; gap: 5px;
+}
+.profile-card-edit {
+  font-size: 11px; color: var(--text-muted);
+  background: transparent; padding: 2px 8px;
+  border-radius: 4px; cursor: pointer;
+  transition: all 0.15s;
+}
+.profile-card-edit:hover { color: var(--title); background: rgba(185,142,255,0.1); }
+.profile-card-body { display: flex; flex-wrap: wrap; gap: 6px; }
+.profile-tag {
+  padding: 2px 10px;
+  border-radius: 5px;
+  font-size: 12px;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.06);
+  color: var(--text-dim);
+}
+.profile-tag.name { color: var(--title); border-color: rgba(185,142,255,0.18); }
+.profile-tag.mbti { color: #81c784; border-color: rgba(129,199,132,0.15); }
+.profile-tag.zodiac { color: #ffb74d; border-color: rgba(255,183,77,0.15); }
+
+.profile-card-empty {
+  margin: 0 20px 8px 20px;
+  padding: 12px 16px;
+  border-radius: 10px;
+  border: 1px dashed rgba(255,255,255,0.07);
+  background: transparent;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s;
+  animation: slideIn 0.35s ease;
+}
+.profile-card-empty:hover {
+  border-color: rgba(185,142,255,0.2);
+  color: var(--title);
+}
+
+/* Profile Form Modal */
+.profile-modal-overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.5);
+  z-index: 200;
+  display: flex; align-items: center; justify-content: center;
+  animation: fadeIn 0.2s ease;
+}
+.profile-modal {
+  width: 460px; max-height: 80vh;
+  background: #111118;
+  border: 1px solid var(--card-border);
+  border-radius: 14px;
+  padding: 24px;
+  overflow-y: auto;
+  display: flex; flex-direction: column; gap: 14px;
+}
+.profile-modal h3 { font-size: 16px; color: var(--title); margin-bottom: 4px; }
+.profile-modal .settings-group { gap: 4px; }
+.profile-modal .settings-group label { font-size: 12px; color: var(--text-dim); letter-spacing: 1px; }
+.profile-modal .pf-input {
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(255,255,255,0.1);
+  background: rgba(255,255,255,0.04);
+  color: var(--text);
+  font-size: 14px;
+  font-family: inherit;
+}
+.profile-modal .pf-input:focus { border-color: var(--title); outline: none; }
+.profile-modal .pf-textarea {
+  resize: vertical; min-height: 50px;
+}
+.profile-modal-actions {
+  display: flex; gap: 10px; justify-content: flex-end; margin-top: 4px;
+}
+.pf-btn-cancel {
+  padding: 8px 16px; border-radius: 8px;
+  background: transparent; color: var(--text-dim);
+  font-size: 13px; cursor: pointer;
+}
+.pf-btn-cancel:hover { color: var(--text); }
+.pf-btn-save {
+  padding: 8px 20px; border-radius: 8px;
+  background: rgba(185,142,255,0.15); color: var(--title);
+  font-size: 13px; font-weight: 600; cursor: pointer;
+}
+.pf-btn-save:hover { background: rgba(185,142,255,0.25); }
 </style>
 </head>
 <body>
@@ -554,6 +662,7 @@ input, textarea {
         <button class="icon-btn" id="btnSettings" title="设置 (Ctrl+,)">⚙</button>
       </div>
     </div>
+    <div class="profile-area" id="profileArea"></div>
     <div class="chat-messages" id="chatMessages">
       <div class="empty-state" id="emptyState">
         <div class="empty-icon">👧🏻</div>
@@ -1085,6 +1194,7 @@ const ChatManager = {
       updatedAt: new Date().toISOString(),
       messages: [],
       summary: null,
+      subjectProfile: null,
     };
     StorageManager.saveChat(chat);
     this._currentChatId = chat.id;
@@ -1128,7 +1238,29 @@ const ChatManager = {
       context[0].content += `\n\n[历史背景：${chat.summary}]`;
     }
 
+    // 注入对象画像
+    if (chat.subjectProfile && chat.subjectProfile.name) {
+      const p = chat.subjectProfile;
+      let profileText = '\n\n[对象画像 — 请针对此画像进行个性化分析和建议]\n';
+      if (p.name) profileText += `称呼：${p.name}`;
+      if (p.mbti) profileText += ` | MBTI：${p.mbti}`;
+      if (p.zodiac) profileText += ` | 星座：${p.zodiac}`;
+      if (p.age) profileText += ` | 年龄：${p.age}`;
+      if (p.relationship) profileText += `\n关系状态：${p.relationship}`;
+      if (p.personality) profileText += `\n性格特点：${p.personality}`;
+      if (p.notes) profileText += `\n补充说明：${p.notes}`;
+      context[0].content += profileText;
+    }
+
     return context.concat(chat.messages);
+  },
+
+  /** 更新当前会话的对象画像 */
+  updateProfile(profileData) {
+    const chat = this.getCurrentChat();
+    if (!chat) return;
+    chat.subjectProfile = profileData;
+    StorageManager.saveChat(chat);
   },
 
   /** 发送用户消息并获取流式回复 */
@@ -1285,6 +1417,7 @@ const UIController = {
       settingsPanel: document.getElementById('settingsPanel'),
       settingsOverlay: document.getElementById('settingsOverlay'),
       toastContainer: document.getElementById('toastContainer'),
+      profileArea: document.getElementById('profileArea'),
     };
 
     this._bindEvents();
@@ -1386,6 +1519,7 @@ const UIController = {
   _newChat() {
     const chat = ChatManager.createChat();
     this._renderSidebar();
+    this._renderProfileCard();
     this._renderMessages();
     this._dom.chatTitle.textContent = '新对话';
     this._dom.chatInput.focus();
@@ -1394,6 +1528,7 @@ const UIController = {
   _switchToChat(chatId) {
     ChatManager.switchChat(chatId);
     this._renderSidebar();
+    this._renderProfileCard();
     this._renderMessages();
     const chat = ChatManager.getCurrentChat();
     if (chat) this._dom.chatTitle.textContent = chat.title;
@@ -1437,6 +1572,110 @@ const UIController = {
     ChatManager._currentChatId = null;
     this._renderSidebar();
     this._newChat();
+  },
+
+  /* ---- 对象画像 ---- */
+  _renderProfileCard() {
+    const chat = ChatManager.getCurrentChat();
+    if (!chat) { this._dom.profileArea.innerHTML = ''; return; }
+
+    const profile = chat.subjectProfile;
+    if (!profile || !profile.name) {
+      // 空状态 — 引导创建画像
+      this._dom.profileArea.innerHTML = `
+        <div class="profile-card-empty" id="profileEmpty">
+          👤 点击这里描述你在意的那个人，我会更有针对性地帮你分析
+        </div>`;
+      document.getElementById('profileEmpty').addEventListener('click', () => this._openProfileModal());
+      return;
+    }
+
+    // 已设置画像 — 展示标签
+    const tags = [];
+    if (profile.name)    tags.push(`<span class="profile-tag name">${this._escapeHtml(profile.name)}</span>`);
+    if (profile.mbti)    tags.push(`<span class="profile-tag mbti">MBTI ${this._escapeHtml(profile.mbti)}</span>`);
+    if (profile.zodiac)  tags.push(`<span class="profile-tag zodiac">${this._escapeHtml(profile.zodiac)}</span>`);
+    if (profile.age)     tags.push(`<span class="profile-tag">${this._escapeHtml(profile.age)}岁</span>`);
+    if (profile.relationship) tags.push(`<span class="profile-tag">${this._escapeHtml(profile.relationship)}</span>`);
+    if (profile.personality)  tags.push(`<span class="profile-tag">${this._escapeHtml(profile.personality)}</span>`);
+
+    this._dom.profileArea.innerHTML = `
+      <div class="profile-card">
+        <div class="profile-card-header">
+          <span class="profile-card-title">👤 对象画像</span>
+          <button class="profile-card-edit" id="btnEditProfile">编辑</button>
+        </div>
+        <div class="profile-card-body">${tags.join('')}</div>
+      </div>`;
+    document.getElementById('btnEditProfile').addEventListener('click', () => this._openProfileModal());
+  },
+
+  _openProfileModal() {
+    const chat = ChatManager.getCurrentChat();
+    const profile = chat?.subjectProfile || {};
+
+    const overlay = document.createElement('div');
+    overlay.className = 'profile-modal-overlay';
+    overlay.id = 'profileModalOverlay';
+    overlay.innerHTML = `
+      <div class="profile-modal">
+        <h3>${profile.name ? '编辑' : '新建'}对象画像</h3>
+        <div class="settings-group">
+          <label>称呼</label>
+          <input class="pf-input" id="pfName" value="${this._escapeHtml(profile.name || '')}" placeholder="比如：小明、阿花、TA">
+        </div>
+        <div class="settings-group">
+          <label>MBTI</label>
+          <input class="pf-input" id="pfMbti" value="${this._escapeHtml(profile.mbti || '')}" placeholder="比如：INFP、ESTJ">
+        </div>
+        <div class="settings-group">
+          <label>星座</label>
+          <input class="pf-input" id="pfZodiac" value="${this._escapeHtml(profile.zodiac || '')}" placeholder="比如：双子座、天蝎座">
+        </div>
+        <div class="settings-group">
+          <label>年龄</label>
+          <input class="pf-input" id="pfAge" value="${this._escapeHtml(profile.age || '')}" placeholder="比如：25">
+        </div>
+        <div class="settings-group">
+          <label>关系状态</label>
+          <input class="pf-input" id="pfRelationship" value="${this._escapeHtml(profile.relationship || '')}" placeholder="比如：暗恋中、恋爱3个月、已婚">
+        </div>
+        <div class="settings-group">
+          <label>性格特点</label>
+          <input class="pf-input" id="pfPersonality" value="${this._escapeHtml(profile.personality || '')}" placeholder="比如：内向敏感、不善于表达">
+        </div>
+        <div class="settings-group">
+          <label>补充说明</label>
+          <textarea class="pf-input pf-textarea" id="pfNotes" placeholder="其他你希望助手了解的背景...">${this._escapeHtml(profile.notes || '')}</textarea>
+        </div>
+        <div class="profile-modal-actions">
+          <button class="pf-btn-cancel" id="pfCancel">取消</button>
+          <button class="pf-btn-save" id="pfSave">保存画像</button>
+        </div>
+      </div>`;
+
+    document.body.appendChild(overlay);
+
+    const close = () => overlay.remove();
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
+    document.getElementById('pfCancel').addEventListener('click', close);
+    document.getElementById('pfSave').addEventListener('click', () => {
+      const data = {
+        name: document.getElementById('pfName').value.trim(),
+        mbti: document.getElementById('pfMbti').value.trim(),
+        zodiac: document.getElementById('pfZodiac').value.trim(),
+        age: document.getElementById('pfAge').value.trim(),
+        relationship: document.getElementById('pfRelationship').value.trim(),
+        personality: document.getElementById('pfPersonality').value.trim(),
+        notes: document.getElementById('pfNotes').value.trim(),
+      };
+      if (!data.name) { this._showToast('请至少填写称呼', 'error'); return; }
+      ChatManager.updateProfile(data);
+      this._renderProfileCard();
+      close();
+      this._showToast('画像已保存，后续对话将自动引用', 'success');
+    });
+    document.getElementById('pfName').focus();
   },
 
   /* ---- 占位方法（Task 8 实现） ---- */
