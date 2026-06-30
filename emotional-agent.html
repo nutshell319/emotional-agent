@@ -1238,8 +1238,217 @@ const UIController = {
   },
 
   /* ---- 占位方法（Task 8 实现） ---- */
-  _renderMessages() { /* Task 8 */ },
-  _send() { /* Task 8 */ },
+  _renderMessages() {
+    const chat = ChatManager.getCurrentChat();
+    this._dom.chatMessages.innerHTML = '';
+
+    if (!chat || chat.messages.length === 0) {
+      this._dom.emptyState.style.display = 'flex';
+      return;
+    }
+
+    this._dom.emptyState.style.display = 'none';
+    const fragment = document.createDocumentFragment();
+
+    chat.messages.forEach((msg, idx) => {
+      if (msg.role === 'user') {
+        fragment.appendChild(this._createUserBubble(msg));
+      } else if (msg.role === 'assistant') {
+        fragment.appendChild(this._createAgentBubble(msg, idx === chat.messages.length - 1 && msg.content.includes('[响应中断]')));
+      }
+    });
+
+    this._dom.chatMessages.appendChild(fragment);
+    this._scrollToBottom();
+  },
+
+  _createUserBubble(msg) {
+    const row = document.createElement('div');
+    row.className = 'msg-row user';
+    row.innerHTML = `
+      <div class="msg-avatar">👤</div>
+      <div>
+        <div class="msg-bubble">${this._escapeHtml(msg.content)}</div>
+        <div class="msg-time">${this._formatTime(msg.timestamp)}</div>
+      </div>`;
+    return row;
+  },
+
+  _createAgentBubble(msg, wasInterrupted) {
+    const row = document.createElement('div');
+    row.className = 'msg-row agent';
+    row.innerHTML = `
+      <div class="msg-avatar">💝</div>
+      <div>
+        <div class="msg-bubble">${this._escapeHtml(msg.content)}</div>
+        <div class="msg-time">${this._formatTime(msg.timestamp)}</div>
+        ${wasInterrupted ? '<span class="continue-hint" data-action="continue">点击继续生成 →</span>' : ''}
+      </div>`;
+
+    const continueBtn = row.querySelector('[data-action="continue"]');
+    if (continueBtn) {
+      continueBtn.addEventListener('click', () => this._continueResponse());
+    }
+    return row;
+  },
+
+  _createRejectCard(message) {
+    const card = document.createElement('div');
+    card.className = 'reject-card';
+    card.textContent = message;
+    return card;
+  },
+
+  _createTypingIndicator() {
+    const row = document.createElement('div');
+    row.className = 'msg-row agent';
+    row.id = 'typingIndicator';
+    row.innerHTML = `
+      <div class="msg-avatar">💝</div>
+      <div>
+        <div class="msg-bubble">
+          <div class="typing-indicator">
+            <div class="typing-dot"></div>
+            <div class="typing-dot"></div>
+            <div class="typing-dot"></div>
+          </div>
+        </div>
+      </div>`;
+    return row;
+  },
+  _send() {
+    const text = this._dom.chatInput.value.trim();
+    if (!text) return;
+
+    this._dom.btnSend.disabled = true;
+    this._dom.chatInput.value = '';
+    this._dom.chatInput.style.height = 'auto';
+
+    this._dom.emptyState.style.display = 'none';
+
+    const typing = this._createTypingIndicator();
+    this._dom.chatMessages.appendChild(typing);
+    this._scrollToBottom();
+
+    ChatManager.sendMessage(text, {
+      onUserMsg: (msg) => {
+        typing.remove();
+        const bubble = this._createUserBubble(msg);
+        this._dom.chatMessages.appendChild(bubble);
+        this._scrollToBottom();
+        this._renderSidebar();
+        this._dom.chatTitle.textContent = ChatManager.getCurrentChat()?.title || '新对话';
+      },
+      onAgentChunk: (chunk) => {
+        if (!this._streamingBubble) {
+          const row = document.createElement('div');
+          row.className = 'msg-row agent';
+          row.innerHTML = `
+            <div class="msg-avatar">💝</div>
+            <div>
+              <div class="msg-bubble streaming"></div>
+            </div>`;
+          this._streamingBubble = row.querySelector('.msg-bubble');
+          this._dom.chatMessages.appendChild(row);
+        }
+        this._streamingBubble.textContent += chunk;
+        this._scrollToBottom();
+      },
+      onAgentDone: () => {
+        if (this._streamingBubble) {
+          this._streamingBubble.classList.remove('streaming');
+        }
+        this._streamingBubble = null;
+        this._dom.btnSend.disabled = false;
+        this._dom.chatInput.focus();
+        this._renderMessages();
+      },
+      onError: (err) => {
+        typing.remove();
+        this._streamingBubble = null;
+        this._dom.btnSend.disabled = false;
+
+        const row = document.createElement('div');
+        row.className = 'msg-row agent error';
+        row.innerHTML = `
+          <div class="msg-avatar">💝</div>
+          <div>
+            <div class="msg-bubble">${this._escapeHtml(err.userMessage || err.message)}</div>
+            <div class="msg-actions">
+              <button class="retry-btn" data-action="retry">重新发送</button>
+            </div>
+          </div>`;
+        const retryBtn = row.querySelector('[data-action="retry"]');
+        retryBtn.addEventListener('click', () => {
+          row.remove();
+          this._dom.chatInput.value = text;
+          this._send();
+        });
+        this._dom.chatMessages.appendChild(row);
+        this._scrollToBottom();
+      },
+      onReject: (message) => {
+        typing.remove();
+        this._dom.btnSend.disabled = false;
+        this._dom.chatInput.focus();
+        const card = this._createRejectCard(message);
+        this._dom.chatMessages.appendChild(card);
+        this._scrollToBottom();
+      },
+    });
+  },
+
+  appendToLastBubble(text) {
+    const bubbles = this._dom.chatMessages.querySelectorAll('.msg-row.agent .msg-bubble');
+    const last = bubbles[bubbles.length - 1];
+    if (last) {
+      last.textContent += text;
+      this._scrollToBottom();
+    }
+  },
+
+  _continueResponse() {
+    const chat = ChatManager.getCurrentChat();
+    if (!chat || chat.messages.length === 0) return;
+
+    const last = chat.messages[chat.messages.length - 1];
+    if (last.role === 'assistant') {
+      last.content = last.content.replace(/\n\n\[响应中断\]$/, '');
+      StorageManager.saveChat(chat);
+    }
+
+    this._dom.btnSend.disabled = true;
+    const typing = this._createTypingIndicator();
+    this._dom.chatMessages.appendChild(typing);
+
+    ChatManager.retryLast().then(() => {
+      typing.remove();
+      this._dom.btnSend.disabled = false;
+      this._renderMessages();
+    }).catch((err) => {
+      typing.remove();
+      this._dom.btnSend.disabled = false;
+      this._showToast(err.userMessage || err.message, 'error');
+    });
+  },
+
+  _scrollToBottom() {
+    requestAnimationFrame(() => {
+      this._dom.chatMessages.scrollTop = this._dom.chatMessages.scrollHeight;
+    });
+  },
+
+  _escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+  },
+
+  _formatTime(isoString) {
+    if (!isoString) return '';
+    const d = new Date(isoString);
+    return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+  },
   _toggleSettings() { /* Task 9 */ },
 
   /* ---- 辅助方法 ---- */
