@@ -1692,7 +1692,11 @@ const UIController = {
         : id === 'settingBaseURL' ? 'baseURL'
         : 'temperature';
       el.addEventListener('change', () => {
-        const value = id === 'settingTemperature' ? parseFloat(el.value) || 0.7 : el.value;
+        let value = el.value;
+        if (id === 'settingTemperature') {
+          const raw = parseFloat(el.value);
+          value = !isNaN(raw) ? raw : 0.7;
+        }
         SettingsManager.set(key, value);
         this._updateApiStatus();
       });
@@ -1709,7 +1713,7 @@ const UIController = {
     document.getElementById('settingApiKey').value = s.apiKey || '';
     document.getElementById('settingBaseURL').value = s.baseURL || '';
     document.getElementById('settingModel').value = s.model || 'doubao-lite-128k';
-    document.getElementById('settingTemperature').value = s.temperature || 0.7;
+    document.getElementById('settingTemperature').value = s.temperature ?? 0.7;
     this._updateApiStatus();
   },
 
