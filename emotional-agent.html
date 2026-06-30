@@ -679,7 +679,7 @@ input, textarea {
   <aside class="sidebar" id="sidebar">
     <div class="sidebar-header">
       <div class="sidebar-logo">
-        <span class="logo-icon" id="sidebarLogoIcon">👧🏻</span>
+        <span class="logo-icon" id="sidebarLogoIcon">👤</span>
         <span id="sidebarLogoName">小暖</span>
       </div>
       <button class="sidebar-btn" id="btnNewChat" title="新对话 (Ctrl+N)">＋</button>
@@ -701,7 +701,7 @@ input, textarea {
     </div>
     <div class="chat-messages" id="chatMessages">
       <div class="empty-state" id="emptyState">
-        <div class="empty-icon">👧🏻</div>
+        <div class="empty-icon">👤</div>
         <div class="empty-text">有什么想聊的？</div>
         <div class="empty-hint">无论是感情困惑还是人际烦恼，我都在这里倾听</div>
       </div>
@@ -1759,7 +1759,7 @@ const UIController = {
     const row = document.createElement('div');
     row.className = 'msg-row agent';
     row.innerHTML = `
-      <div class="msg-avatar">👧🏻</div>
+      <div class="msg-avatar">👤</div>
       <div>
         <div class="msg-bubble">${this._escapeHtml(msg.content)}</div>
         <div class="msg-time">${this._formatTime(msg.timestamp)}</div>
@@ -1785,7 +1785,7 @@ const UIController = {
     row.className = 'msg-row agent';
     row.id = 'typingIndicator';
     row.innerHTML = `
-      <div class="msg-avatar">👧🏻</div>
+      <div class="msg-avatar">👤</div>
       <div>
         <div class="msg-bubble">
           <div class="typing-indicator">
@@ -1825,7 +1825,7 @@ const UIController = {
           const row = document.createElement('div');
           row.className = 'msg-row agent';
           row.innerHTML = `
-            <div class="msg-avatar">👧🏻</div>
+            <div class="msg-avatar">👤</div>
             <div>
               <div class="msg-bubble streaming"></div>
             </div>`;
@@ -1852,7 +1852,7 @@ const UIController = {
         const row = document.createElement('div');
         row.className = 'msg-row agent error';
         row.innerHTML = `
-          <div class="msg-avatar">👧🏻</div>
+          <div class="msg-avatar">👤</div>
           <div>
             <div class="msg-bubble">${this._escapeHtml(err.userMessage || err.message)}</div>
             <div class="msg-actions">
