@@ -1858,6 +1858,7 @@ const UIController = {
     this._dom.chatInput.style.height = 'auto';
 
     this._dom.emptyState.style.display = 'none';
+    this._dom.mainArea.classList.remove('is-empty');
 
     const typing = this._createTypingIndicator();
     this._dom.chatMessages.appendChild(typing);
