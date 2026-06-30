@@ -394,6 +394,128 @@ input, textarea {
   cursor: pointer;
 }
 .continue-hint:hover { color: var(--title); }
+/* ========================================
+   Settings Panel
+   ======================================== */
+.settings-overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.4);
+  z-index: 50;
+  display: none;
+}
+.settings-overlay.open { display: block; }
+
+.settings-panel {
+  position: fixed;
+  top: 0; right: 0;
+  width: var(--settings-width);
+  height: 100%;
+  background: var(--bg);
+  border-left: 1px solid var(--card-border);
+  z-index: 51;
+  display: flex;
+  flex-direction: column;
+  transform: translateX(100%);
+  transition: transform 0.3s cubic-bezier(.22,1,.36,1);
+}
+.settings-panel.open { transform: translateX(0); }
+
+.settings-header {
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--card-border);
+  display: flex; align-items: center; justify-content: space-between;
+}
+.settings-header h3 { font-size: 16px; color: var(--title); font-weight: 600; }
+.close-btn {
+  width: 28px; height: 28px;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-dim);
+  font-size: 16px;
+  display: flex; align-items: center; justify-content: center;
+}
+.close-btn:hover { background: rgba(255,255,255,0.06); }
+
+.settings-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px;
+  display: flex; flex-direction: column; gap: 18px;
+}
+.settings-group { display: flex; flex-direction: column; gap: 6px; }
+.settings-group label {
+  font-size: 12px; color: var(--text-dim);
+  text-transform: uppercase; letter-spacing: 1px;
+}
+.settings-input {
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(255,255,255,0.1);
+  background: rgba(255,255,255,0.04);
+  color: var(--text);
+  font-size: 14px;
+  font-family: inherit;
+}
+.settings-input:focus { border-color: var(--title); }
+.settings-input::placeholder { color: var(--text-muted); }
+
+.settings-select {
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(255,255,255,0.1);
+  background: rgba(255,255,255,0.04);
+  color: var(--text);
+  font-size: 14px;
+  font-family: inherit;
+  cursor: pointer;
+}
+.settings-select option { background: #1a1a2e; color: var(--text); }
+
+.settings-hint {
+  font-size: 11px; color: var(--text-muted); line-height: 1.5;
+}
+
+.settings-divider {
+  height: 1px;
+  background: var(--card-border);
+  margin: 4px 0;
+}
+
+.settings-actions {
+  display: flex; gap: 10px;
+}
+.btn-primary {
+  flex: 1;
+  padding: 10px;
+  border-radius: 8px;
+  background: rgba(185,142,255,0.15);
+  color: var(--title);
+  font-size: 13px;
+  font-weight: 600;
+  transition: background 0.15s;
+}
+.btn-primary:hover { background: rgba(185,142,255,0.25); }
+.btn-danger {
+  flex: 1;
+  padding: 10px;
+  border-radius: 8px;
+  background: rgba(232,93,117,0.08);
+  color: var(--accent);
+  font-size: 13px;
+  transition: background 0.15s;
+}
+.btn-danger:hover { background: rgba(232,93,117,0.18); }
+
+.status-badge {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+}
+.status-badge.ok { background: rgba(76,175,80,0.1); color: #81c784; }
+.status-badge.warn { background: rgba(255,152,0,0.1); color: #ffb74d; }
+
+.file-input-hidden { display: none; }
 </style>
 </head>
 <body>
@@ -440,7 +562,50 @@ input, textarea {
   <!-- 设置面板（初始隐藏） -->
   <div class="settings-overlay" id="settingsOverlay"></div>
   <aside class="settings-panel" id="settingsPanel">
-    <!-- Task 9 填充 -->
+    <div class="settings-header">
+      <h3>设置</h3>
+      <button class="close-btn" id="btnCloseSettings">✕</button>
+    </div>
+    <div class="settings-body">
+      <div id="apiStatus"></div>
+
+      <div class="settings-group">
+        <label>API Key</label>
+        <input class="settings-input" id="settingApiKey" type="password" placeholder="sk-...">
+      </div>
+
+      <div class="settings-group">
+        <label>Base URL</label>
+        <input class="settings-input" id="settingBaseURL" placeholder="https://ark.cn-beijing.volces.com/api/v3">
+        <span class="settings-hint">豆包/DeepSeek 等 OpenAI 兼容 API 地址</span>
+      </div>
+
+      <div class="settings-group">
+        <label>模型</label>
+        <select class="settings-select" id="settingModel">
+          <option value="doubao-lite-128k">豆包 Lite (128K)</option>
+          <option value="doubao-pro-128k">豆包 Pro (128K)</option>
+          <option value="deepseek-chat">DeepSeek V3</option>
+          <option value="deepseek-reasoner">DeepSeek R1</option>
+        </select>
+      </div>
+
+      <div class="settings-group">
+        <label>温度 (Temperature)</label>
+        <input class="settings-input" id="settingTemperature" type="number" min="0" max="2" step="0.1" placeholder="0.7">
+        <span class="settings-hint">0 = 严谨，1 = 创意，建议情感对话 0.7-0.9</span>
+      </div>
+
+      <div class="settings-divider"></div>
+
+      <div class="settings-actions">
+        <button class="btn-primary" id="btnExport">📥 导出备份</button>
+        <button class="btn-primary" id="btnImport">📤 导入备份</button>
+      </div>
+      <input type="file" class="file-input-hidden" id="importFileInput" accept=".json">
+
+      <button class="btn-danger" id="btnClearData">🗑 清除所有数据</button>
+    </div>
   </aside>
 </div>
 
@@ -1104,6 +1269,8 @@ const UIController = {
     };
 
     this._bindEvents();
+    this._bindSettingsEvents();
+    this._loadSettingsToForm();
     this._renderSidebar();
     this._loadLastChat();
   },
@@ -1449,7 +1616,96 @@ const UIController = {
     const d = new Date(isoString);
     return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
   },
-  _toggleSettings() { /* Task 9 */ },
+  _toggleSettings(force) {
+    const isOpen = this._dom.settingsPanel.classList.contains('open');
+    const shouldOpen = force !== undefined ? force : !isOpen;
+    if (shouldOpen) {
+      this._loadSettingsToForm();
+      this._dom.settingsPanel.classList.add('open');
+      this._dom.settingsOverlay.classList.add('open');
+    } else {
+      this._dom.settingsPanel.classList.remove('open');
+      this._dom.settingsOverlay.classList.remove('open');
+    }
+  },
+
+  _bindSettingsEvents() {
+    this._dom.btnCloseSettings = document.getElementById('btnCloseSettings');
+    this._dom.btnExport = document.getElementById('btnExport');
+    this._dom.btnImport = document.getElementById('btnImport');
+    this._dom.btnClearData = document.getElementById('btnClearData');
+    this._dom.importFileInput = document.getElementById('importFileInput');
+
+    this._dom.btnCloseSettings.addEventListener('click', () => this._toggleSettings(false));
+    this._dom.settingsOverlay.addEventListener('click', () => this._toggleSettings(false));
+
+    this._dom.btnExport.addEventListener('click', () => {
+      StorageManager.exportJSON();
+      this._showToast('备份已下载', 'success');
+    });
+
+    this._dom.btnImport.addEventListener('click', () => {
+      this._dom.importFileInput.click();
+    });
+    this._dom.importFileInput.addEventListener('change', async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      try {
+        const count = await StorageManager.importJSON(file);
+        this._showToast(`成功导入 ${count} 个新会话`, 'success');
+        this._renderSidebar();
+        this._loadLastChat();
+      } catch (err) {
+        this._showToast(err.message, 'error');
+      }
+      this._dom.importFileInput.value = '';
+    });
+
+    this._dom.btnClearData.addEventListener('click', () => {
+      if (!confirm('确定要清除所有数据吗？此操作不可撤销。建议先导出备份。')) return;
+      localStorage.clear();
+      ChatManager._currentChatId = null;
+      this._renderSidebar();
+      this._newChat();
+      this._loadSettingsToForm();
+      this._showToast('所有数据已清除', 'info');
+    });
+
+    ['settingApiKey', 'settingBaseURL', 'settingTemperature'].forEach(id => {
+      const el = document.getElementById(id);
+      const key = id === 'settingApiKey' ? 'apiKey'
+        : id === 'settingBaseURL' ? 'baseURL'
+        : 'temperature';
+      el.addEventListener('change', () => {
+        const value = id === 'settingTemperature' ? parseFloat(el.value) || 0.7 : el.value;
+        SettingsManager.set(key, value);
+        this._updateApiStatus();
+      });
+    });
+
+    document.getElementById('settingModel').addEventListener('change', (e) => {
+      SettingsManager.set('model', e.target.value);
+      this._updateApiStatus();
+    });
+  },
+
+  _loadSettingsToForm() {
+    const s = SettingsManager.getAll();
+    document.getElementById('settingApiKey').value = s.apiKey || '';
+    document.getElementById('settingBaseURL').value = s.baseURL || '';
+    document.getElementById('settingModel').value = s.model || 'doubao-lite-128k';
+    document.getElementById('settingTemperature').value = s.temperature || 0.7;
+    this._updateApiStatus();
+  },
+
+  _updateApiStatus() {
+    const el = document.getElementById('apiStatus');
+    if (SettingsManager.isValid()) {
+      el.innerHTML = '<span class="status-badge ok">● API 已配置</span>';
+    } else {
+      el.innerHTML = '<span class="status-badge warn">○ API 未配置 — 请填入 Key</span>';
+    }
+  },
 
   /* ---- 辅助方法 ---- */
   _showToast(message, type) {
