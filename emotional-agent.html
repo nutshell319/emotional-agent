@@ -1273,6 +1273,7 @@ const UIController = {
     this._loadSettingsToForm();
     this._renderSidebar();
     this._loadLastChat();
+    this._checkFirstRun();
   },
 
   /* ---- 事件绑定 ---- */
@@ -1733,6 +1734,15 @@ const UIController = {
     toast.textContent = message;
     this._dom.toastContainer.appendChild(toast);
     setTimeout(() => toast.remove(), 3000);
+  },
+
+  _checkFirstRun() {
+    if (!SettingsManager.isValid()) {
+      setTimeout(() => {
+        this._showToast('欢迎使用小暖！请先配置 API Key', 'info');
+        this._toggleSettings(true);
+      }, 500);
+    }
   },
 };
 
