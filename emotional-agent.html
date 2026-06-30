@@ -1291,6 +1291,21 @@ const UIController = {
     });
     this._dom.btnSettings.addEventListener('click', () => this._toggleSettings());
     this._dom.btnClearAll.addEventListener('click', () => this._clearAllChats());
+
+    // 键盘快捷键
+    document.addEventListener('keydown', (e) => {
+      if (e.ctrlKey && e.key === 'n') {
+        e.preventDefault();
+        this._newChat();
+      }
+      if (e.ctrlKey && e.key === ',') {
+        e.preventDefault();
+        this._toggleSettings(true);
+      }
+      if (e.key === 'Escape' && this._dom.settingsPanel.classList.contains('open')) {
+        this._toggleSettings(false);
+      }
+    });
   },
 
   /* ---- 侧边栏渲染 ---- */
@@ -1722,6 +1737,28 @@ const UIController = {
    ======================================== */
 document.addEventListener('DOMContentLoaded', () => {
   UIController.init();
+});
+
+/* ========================================
+   Global Error Handler
+   ======================================== */
+window.onerror = (msg, url, line, col, error) => {
+  console.error('[小暖] 未捕获错误:', msg, 'at', line, ':', col);
+  const toast = document.createElement('div');
+  toast.className = 'toast error';
+  toast.textContent = '出了点问题，刷新页面即可恢复';
+  document.getElementById('toastContainer').appendChild(toast);
+  setTimeout(() => toast.remove(), 4000);
+  return true;
+};
+
+window.addEventListener('unhandledrejection', (e) => {
+  console.error('[小暖] 未处理的Promise拒绝:', e.reason);
+  const toast = document.createElement('div');
+  toast.className = 'toast error';
+  toast.textContent = '出了点问题，刷新页面即可恢复';
+  document.getElementById('toastContainer').appendChild(toast);
+  setTimeout(() => toast.remove(), 4000);
 });
 </script>
 
