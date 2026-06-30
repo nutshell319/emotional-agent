@@ -448,22 +448,22 @@ input, textarea {
 .retry-btn:hover { background: rgba(232,93,117,0.2); }
 
 /* Typing indicator — 思考动画 */
-.typing-indicator {
-  display: flex; align-items: center; gap: 4px;
-}
 #typingIndicator .msg-content {
-  max-width: none;
+  flex: none; max-width: none; width: auto;
 }
 #typingIndicator .msg-bubble {
-  padding: 6px 12px;
-  border-radius: 20px;
-  background: rgba(255,255,255,0.04);
-  border: 1px solid rgba(255,255,255,0.06);
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
-  width: fit-content;
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 5px 10px;
+  border-radius: 14px;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.05);
+  backdrop-filter: none; -webkit-backdrop-filter: none;
+  font-size: 11px; color: var(--text-dim);
 }
-.thinking-label {
+#typingIndicator .msg-bubble > * {
+  display: contents;
+}
+#typingIndicator .thinking-label {
   font-size: 11px;
   color: var(--text-dim);
   background: linear-gradient(90deg, var(--text-dim) 0%, var(--title) 50%, var(--text-dim) 100%);
@@ -477,17 +477,15 @@ input, textarea {
   0% { background-position: 200% 0; }
   100% { background-position: -200% 0; }
 }
-.thinking-dots {
-  display: flex; gap: 2px;
-}
-.thinking-dot {
+#typingIndicator .thinking-dot {
+  display: inline-block;
   width: 3px; height: 3px;
   border-radius: 50%;
   background: var(--title);
   animation: thinkingBounce 1.2s infinite ease-in-out;
 }
-.thinking-dot:nth-child(2) { animation-delay: 0.2s; }
-.thinking-dot:nth-child(3) { animation-delay: 0.4s; }
+#typingIndicator .thinking-dot:nth-child(2) { animation-delay: 0.2s; }
+#typingIndicator .thinking-dot:nth-child(3) { animation-delay: 0.4s; }
 @keyframes thinkingBounce {
   0%, 60%, 100% { transform: translateY(0); opacity: 0.3; }
   30% { transform: translateY(-6px); opacity: 1; }
@@ -1933,14 +1931,10 @@ const UIController = {
       <div class="msg-avatar">👧🏻</div>
       <div class="msg-content">
         <div class="msg-bubble">
-          <div class="typing-indicator">
-            <span class="thinking-label">${this._escapeHtml(name)}正在思考</span>
-            <span class="thinking-dots">
-              <span class="thinking-dot"></span>
-              <span class="thinking-dot"></span>
-              <span class="thinking-dot"></span>
-            </span>
-          </div>
+          <span class="thinking-label">${this._escapeHtml(name)}正在思考</span>
+          <span class="thinking-dot"></span>
+          <span class="thinking-dot"></span>
+          <span class="thinking-dot"></span>
         </div>
       </div>`;
     return row;
