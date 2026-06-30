@@ -500,6 +500,70 @@ const DeepSeekClient = {
 };
 
 /* ========================================
+   ContextCompressor — 超过20轮时压缩早期对话
+   ======================================== */
+const ContextCompressor = {
+  MAX_ROUNDS: 20,  // 保留最近N轮完整内容
+  // 一轮 = 一条user消息 + 一条assistant回复
+
+  /** 判断是否需要压缩 */
+  needsCompression(messages) {
+    // messages不包含system prompt，只算user+assistant对数
+    const rounds = Math.floor(messages.length / 2);
+    return rounds > this.MAX_ROUNDS;
+  },
+
+  /** 构建压缩用的prompt */
+  _buildCompressionPrompt(oldMessages) {
+    const history = oldMessages
+      .map(m => `${m.role === 'user' ? '用户' : '小暖'}: ${m.content}`)
+      .join('\n\n');
+    return [
+      { role: 'system', content: '你是一个对话摘要助手。请将以下情感咨询对话压缩为一段200字以内的中文摘要，保留：1)用户的核心困扰 2)已讨论过的主要方向 3)用户表达过的倾向或决定。只输出摘要文本，不加前缀。' },
+      { role: 'user', content: `请压缩以下对话：\n\n${history}` },
+    ];
+  },
+
+  /**
+   * 压缩消息列表。
+   * 返回 { messages: 压缩后的完整消息列表, summary: 摘要文本 }
+   * messages已包含system prompt占位（由ChatManager拼接）
+   */
+  async compress(messages, existingSummary) {
+    const rounds = Math.floor(messages.length / 2);
+    if (rounds <= this.MAX_ROUNDS) {
+      return { messages, summary: existingSummary };
+    }
+
+    // 超出部分
+    const overflowCount = (rounds - this.MAX_ROUNDS) * 2; // 转换为消息条数
+    const oldPart = messages.slice(0, overflowCount);
+    const recentPart = messages.slice(overflowCount);
+
+    // 调用API压缩
+    let newSummary;
+    try {
+      const compressMessages = this._buildCompressionPrompt(oldPart);
+      newSummary = await DeepSeekClient.chat(compressMessages);
+    } catch (e) {
+      // 压缩失败则截断（降级方案）
+      console.warn('[ContextCompressor] 压缩失败，使用截断:', e);
+      return {
+        messages: recentPart,
+        summary: existingSummary || '(早期对话因过长已省略)',
+      };
+    }
+
+    // 合并旧摘要
+    const combinedSummary = existingSummary
+      ? `${existingSummary}；${newSummary}`
+      : newSummary;
+
+    return { messages: recentPart, summary: combinedSummary };
+  },
+};
+
+/* ========================================
    INIT — 页面加载入口（后续任务填充）
    ======================================== */
 document.addEventListener('DOMContentLoaded', () => {
