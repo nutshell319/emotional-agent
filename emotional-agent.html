@@ -361,6 +361,145 @@ const SafetyGuard = {
 };
 
 /* ========================================
+   System Prompt
+   ======================================== */
+const SYSTEM_PROMPT = `你是"小暖"，一个专业的情感沟通助手。你的使命是帮助用户理解自己的情感、改善与重要他人的沟通、建立更健康的关系模式。
+
+## 核心原则
+1. **先共情后分析** — 永远先接住用户的情绪，认可感受，再引导思考
+2. **多问少断** — 用开放式问题引导用户自己发现答案，不急于下结论
+3. **具体化建议** — 给出可执行的话术和行为建议，比如"你可以试着说：我感到...因为..."，而不是"你要多沟通"
+4. **中立不评判** — 帮助理解各方立场，不选边站，不替用户做决定
+
+## 对话风格
+- 温暖但不煽情，专业但不说教
+- 适当使用心理学概念（依恋理论、非暴力沟通、情绪ABC等），但用通俗语言解释
+- 回复长度适中：一般问题 150-300 字，复杂分析不超过 500 字
+- 使用"你"而非"您"，保持亲切但不轻浮
+
+## 领域边界
+你只回答以下范围内的问题：恋爱关系、婚姻家庭、人际沟通、情绪管理、自我认知。
+遇到范围外的问题，回复："抱歉，我是情感沟通助手，只能帮你解答感情和人际关系方面的问题。如果有情感方面的困扰，随时找我聊聊。"
+
+## 安全规则
+- 当用户表达自杀/自伤意念：表达深切关心 → 明确告知你是AI无法提供危机干预 → 提供全国心理援助热线 400-161-9995
+- 涉及家暴/虐待：提供求助资源（110 / 12338），不建议自行处理
+- 涉及心理疾病症状：明确你不是医生，建议就医
+- 永远不要鼓励伤害自己或他人的行为`;
+
+/* ========================================
+   DeepSeekClient — LLM API通信（OpenAI兼容格式）
+   ======================================== */
+const DeepSeekClient = {
+  /** 流式聊天（SSE） */
+  async streamChat(messages, callbacks) {
+    const { onChunk, onDone, onError } = callbacks;
+    const settings = SettingsManager.getAll();
+
+    if (!settings.apiKey) {
+      onError(new Error('API Key 未设置，请按 Ctrl+, 打开设置'));
+      return;
+    }
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30s超时
+
+    try {
+      const response = await fetch(`${settings.baseURL}/chat/completions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${settings.apiKey}`,
+        },
+        body: JSON.stringify({
+          model: settings.model,
+          messages: messages,
+          temperature: settings.temperature,
+          stream: true,
+        }),
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        const err = new Error(`API 错误`);
+        err.status = response.status;
+        if (response.status === 401) err.userMessage = 'API Key 无效，请检查后重新输入';
+        else if (response.status === 429) err.userMessage = '请求过于频繁，请稍后再试';
+        else err.userMessage = `服务器错误 (${response.status})，请稍后重试`;
+        throw err;
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || ''; // 不完整的行留在buffer
+
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed || !trimmed.startsWith('data: ')) continue;
+          const data = trimmed.slice(6);
+          if (data === '[DONE]') {
+            onDone();
+            return;
+          }
+          try {
+            const json = JSON.parse(data);
+            const content = json.choices?.[0]?.delta?.content;
+            if (content) onChunk(content);
+          } catch (e) {
+            // 跳过解析失败的行（某些API可能返回非标准格式）
+          }
+        }
+      }
+      onDone();
+    } catch (err) {
+      clearTimeout(timeoutId);
+      if (err.name === 'AbortError') {
+        onError(new Error('请求超时，请检查网络后重试'));
+      } else if (!err.userMessage) {
+        err.userMessage = '网络连接失败，请检查网络后重试';
+      }
+      onError(err);
+    }
+  },
+
+  /** 非流式请求（用于上下文压缩） */
+  async chat(messages) {
+    const settings = SettingsManager.getAll();
+
+    const response = await fetch(`${settings.baseURL}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${settings.apiKey}`,
+      },
+      body: JSON.stringify({
+        model: settings.model,
+        messages: messages,
+        temperature: 0.3, // 压缩用低温度
+        stream: false,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`API 请求失败: ${response.status}`);
+    }
+
+    const data = await response.json();
+    return data.choices?.[0]?.message?.content || '';
+  },
+};
+
+/* ========================================
    INIT — 页面加载入口（后续任务填充）
    ======================================== */
 document.addEventListener('DOMContentLoaded', () => {
