@@ -381,7 +381,7 @@ input, textarea {
   padding: 10px 14px;
   border-radius: 14px;
   font-size: 14px;
-  line-height: 1.65;
+  line-height: 1.55;
   white-space: pre-wrap;
   word-break: break-word;
   position: relative;
@@ -879,10 +879,14 @@ input, textarea {
 /* ========================================
    Utils
    ======================================== */
-/** 过滤Markdown符号：移除** * # 等 */
+/** 过滤Markdown符号 + 规范化空行 */
 function stripMarkdown(text) {
   if (!text) return text;
-  return text.replace(/\*\*/g, '').replace(/(?<!\*)\*(?!\*)/g, '').replace(/^#+\s/gm, '');
+  return text
+    .replace(/\*\*/g, '')
+    .replace(/(?<!\*)\*(?!\*)/g, '')
+    .replace(/^#+\s/gm, '')
+    .replace(/\n{3,}/g, '\n\n');  // 3个以上连续换行压缩为2个
 }
 
 /* ========================================
@@ -1153,6 +1157,7 @@ function getSystemPrompt(name) {
 - 可以用"我之前遇到过一个类似的情况..."这种讲故事的方式
 - 段落之间自然过渡，不要像切换PPT页面
 - ⚠️ 禁止使用任何星号（*）、双星号（**）、井号（#）等Markdown语法。emoji可以偶尔点缀在句子中，但不要作为结构化的段落标题
+- 段落之间最多空一行，不要连续空多行。段落内部不要频繁换行，让文字自然流动
 
 ## 领域边界
 你只回答以下范围内的问题：恋爱关系、婚姻家庭、人际沟通、情绪管理、自我认知。
