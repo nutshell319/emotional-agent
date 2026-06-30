@@ -1945,15 +1945,17 @@ const UIController = {
 
     ChatManager.sendMessage(text, {
       onUserMsg: (msg) => {
-        typing.remove();
+        // 保留思考动画，用户气泡和思考同屏显示
         const bubble = this._createUserBubble(msg);
-        this._dom.chatMessages.appendChild(bubble);
+        this._dom.chatMessages.insertBefore(bubble, typing);
         this._scrollToBottom();
         this._renderSidebar();
         this._dom.chatTitle.textContent = ChatManager.getCurrentChat()?.title || '新对话';
       },
       onAgentChunk: (chunk) => {
         if (!this._streamingBubble) {
+          // 第一个chunk到达，移除思考动画
+          typing.remove();
           const row = document.createElement('div');
           row.className = 'msg-row agent';
           row.innerHTML = `
