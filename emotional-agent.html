@@ -449,10 +449,13 @@ input, textarea {
 
 /* Typing indicator — 思考动画 */
 .typing-indicator {
-  display: flex; align-items: center; gap: 4px; padding: 4px 0;
+  display: flex; align-items: center; gap: 4px;
+}
+#typingIndicator .msg-bubble {
+  padding: 8px 14px;
 }
 .thinking-label {
-  font-size: 13px;
+  font-size: 12px;
   color: var(--text-dim);
   background: linear-gradient(90deg, var(--text-dim) 0%, var(--title) 50%, var(--text-dim) 100%);
   background-size: 200% 100%;
@@ -469,7 +472,7 @@ input, textarea {
   display: flex; gap: 2px;
 }
 .thinking-dot {
-  width: 4px; height: 4px;
+  width: 3px; height: 3px;
   border-radius: 50%;
   background: var(--title);
   animation: thinkingBounce 1.2s infinite ease-in-out;
@@ -482,12 +485,17 @@ input, textarea {
 }
 
 /* 思考时头像微动 */
+.msg-row.agent.thinking {
+  gap: 6px;
+}
 .msg-row.agent.thinking .msg-avatar {
+  width: 26px; height: 26px;
+  font-size: 13px;
   animation: avatarPulse 2s ease-in-out infinite;
 }
 @keyframes avatarPulse {
   0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.08); }
+  50% { transform: scale(1.06); }
 }
 
 /* "继续"按钮（中断补全） */
