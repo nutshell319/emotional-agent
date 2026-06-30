@@ -224,14 +224,6 @@ input, textarea {
   position: absolute; top: 0; left: 0; right: 0;
   z-index: 5;
 }
-.main-area.is-empty .profile-area {
-  width: 600px;
-  max-width: calc(100% - 40px);
-  margin-bottom: 0;
-}
-.main-area.is-empty .profile-card-empty {
-  margin: 0 0 16px 0;
-}
 .main-area.is-empty .chat-messages {
   flex: 0 0 auto;
   width: 600px;
@@ -560,101 +552,72 @@ input, textarea {
 .file-input-hidden { display: none; }
 
 /* ========================================
-   Profile Card — 角色卡片风格
+   Profile Card — 侧边栏紧凑卡片
    ======================================== */
 .profile-area { flex-shrink: 0; }
 .profile-card {
-  margin: 12px 20px 20px 20px;
-  padding: 24px 20px 18px 20px;
-  border-radius: 14px;
+  margin: 8px 8px 4px 8px;
+  padding: 10px 12px;
+  border-radius: 10px;
   border: 1px solid rgba(185,142,255,0.12);
-  background: linear-gradient(180deg, rgba(185,142,255,0.04) 0%, rgba(255,255,255,0.01) 100%);
-  text-align: center;
-  animation: slideIn 0.35s ease;
-}
-.profile-card .pf-avatar {
-  width: 56px; height: 56px;
-  border-radius: 50%;
-  margin: 0 auto 10px;
-  background: linear-gradient(135deg, rgba(185,142,255,0.2), rgba(232,93,117,0.15));
-  display: flex; align-items: center; justify-content: center;
-  font-size: 28px;
-}
-.profile-card .pf-name {
-  font-size: 18px; font-weight: 700; color: var(--text);
-  margin-bottom: 4px;
-}
-.profile-card .pf-sub {
-  font-size: 12px; color: var(--text-dim);
-  margin-bottom: 14px;
-}
-.profile-card .pf-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 8px;
-  margin-bottom: 10px;
-}
-.profile-card .pf-item {
-  padding: 8px 6px;
-  border-radius: 8px;
-  background: rgba(255,255,255,0.02);
-  border: 1px solid rgba(255,255,255,0.05);
-}
-.profile-card .pf-item-label {
-  font-size: 10px; color: var(--text-muted);
-  margin-bottom: 2px; letter-spacing: 0.5px;
-}
-.profile-card .pf-item-val {
-  font-size: 13px; color: var(--text); font-weight: 600;
-}
-.profile-card .pf-item-val.mbti { color: #81c784; }
-.profile-card .pf-item-val.zodiac { color: #ffb74d; }
-.profile-card .pf-item-val.age { color: var(--title); }
-.profile-card .pf-item-val.relation { color: var(--accent); }
-.profile-card .pf-notes {
-  font-size: 12px; color: var(--text-dim);
-  padding: 8px 12px;
-  border-radius: 8px;
-  background: rgba(255,255,255,0.02);
-  text-align: left;
-  line-height: 1.5;
-}
-.profile-card .pf-edit-btn {
-  margin-top: 12px;
-  padding: 4px 16px;
-  border-radius: 14px;
-  background: transparent;
-  color: var(--text-muted);
-  font-size: 11px;
+  background: rgba(185,142,255,0.03);
   cursor: pointer;
   transition: all 0.15s;
-  border: 1px solid rgba(255,255,255,0.06);
+  animation: slideIn 0.25s ease;
 }
-.profile-card .pf-edit-btn:hover {
-  color: var(--title);
-  border-color: rgba(185,142,255,0.2);
+.profile-card:hover {
+  border-color: rgba(185,142,255,0.22);
+  background: rgba(185,142,255,0.05);
 }
+.profile-card .pf-row {
+  display: flex; align-items: center; gap: 10px;
+}
+.profile-card .pf-avatar {
+  width: 36px; height: 36px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: linear-gradient(135deg, rgba(185,142,255,0.2), rgba(232,93,117,0.12));
+  display: flex; align-items: center; justify-content: center;
+  font-size: 18px;
+}
+.profile-card .pf-info { flex: 1; min-width: 0; }
+.profile-card .pf-name {
+  font-size: 13px; font-weight: 600; color: var(--text);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.profile-card .pf-tags {
+  display: flex; flex-wrap: wrap; gap: 4px; margin-top: 3px;
+}
+.profile-card .pf-tag {
+  padding: 1px 7px;
+  border-radius: 4px;
+  font-size: 10px;
+  background: rgba(255,255,255,0.04);
+  color: var(--text-dim);
+}
+.profile-card .pf-tag.mbti { color: #81c784; }
+.profile-card .pf-tag.zodiac { color: #ffb74d; }
+.profile-card .pf-tag.relation { color: var(--accent); }
+.profile-card .pf-edit-icon {
+  font-size: 12px; color: var(--text-muted);
+  opacity: 0; transition: opacity 0.15s;
+  flex-shrink: 0;
+}
+.profile-card:hover .pf-edit-icon { opacity: 1; }
 
 .profile-card-empty {
-  margin: 12px 20px 20px 20px;
-  padding: 28px 20px;
-  border-radius: 14px;
-  border: 1px dashed rgba(255,255,255,0.08);
-  background: transparent;
-  text-align: center;
-  color: var(--text-muted);
-  font-size: 13px;
-  cursor: pointer;
-  transition: all 0.2s;
-  animation: slideIn 0.35s ease;
+  margin: 8px 8px 4px 8px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1px dashed rgba(255,255,255,0.06);
+  font-size: 11px; color: var(--text-muted);
+  text-align: center; cursor: pointer;
+  transition: all 0.15s;
+  animation: slideIn 0.25s ease;
 }
 .profile-card-empty:hover {
-  border-color: rgba(185,142,255,0.25);
+  border-color: rgba(185,142,255,0.2);
   color: var(--title);
-  background: rgba(185,142,255,0.02);
-}
-.profile-card-empty .pf-empty-icon {
-  font-size: 36px; display: block; margin-bottom: 8px; opacity: 0.5;
 }
 
 /* Profile Form Modal */
@@ -721,6 +684,7 @@ input, textarea {
       </div>
       <button class="sidebar-btn" id="btnNewChat" title="新对话 (Ctrl+N)">＋</button>
     </div>
+    <div class="profile-area" id="profileArea"></div>
     <div class="chat-list" id="chatList"></div>
     <div class="sidebar-footer">
       <button class="sidebar-footer-btn" id="btnClearAll">清除全部对话</button>
@@ -735,7 +699,6 @@ input, textarea {
         <button class="icon-btn" id="btnSettings" title="设置 (Ctrl+,)">⚙</button>
       </div>
     </div>
-    <div class="profile-area" id="profileArea"></div>
     <div class="chat-messages" id="chatMessages">
       <div class="empty-state" id="emptyState">
         <div class="empty-icon">👧🏻</div>
@@ -1657,47 +1620,32 @@ const UIController = {
     if (!profile || !profile.name) {
       this._dom.profileArea.innerHTML = `
         <div class="profile-card-empty" id="profileEmpty">
-          <span class="pf-empty-icon">👤</span>
-          点击创建对象画像，我会更有针对性地帮你分析
+          ＋ 添加对象画像
         </div>`;
       document.getElementById('profileEmpty').addEventListener('click', () => this._openProfileModal());
       return;
     }
 
-    // 构建副标题（关系 + 年龄）
-    const subParts = [];
-    if (profile.relationship) subParts.push(profile.relationship);
-    if (profile.age) subParts.push(profile.age + '岁');
-    const subtitle = subParts.length > 0 ? subParts.join(' · ') : '';
-
-    // 构建属性网格
-    const gridItems = [];
-    if (profile.mbti)
-      gridItems.push(`<div class="pf-item"><div class="pf-item-label">MBTI</div><div class="pf-item-val mbti">${this._escapeHtml(profile.mbti)}</div></div>`);
-    if (profile.zodiac)
-      gridItems.push(`<div class="pf-item"><div class="pf-item-label">星座</div><div class="pf-item-val zodiac">${this._escapeHtml(profile.zodiac)}</div></div>`);
-    if (profile.personality)
-      gridItems.push(`<div class="pf-item"><div class="pf-item-label">性格</div><div class="pf-item-val">${this._escapeHtml(profile.personality)}</div></div>`);
-    if (profile.relationship)
-      gridItems.push(`<div class="pf-item"><div class="pf-item-label">关系</div><div class="pf-item-val relation">${this._escapeHtml(profile.relationship)}</div></div>`);
-    if (profile.age)
-      gridItems.push(`<div class="pf-item"><div class="pf-item-label">年龄</div><div class="pf-item-val age">${this._escapeHtml(profile.age)}岁</div></div>`);
-    // 如果还有空位，补上mbti/星座（已在上面处理）
-
-    const notesHtml = profile.notes
-      ? `<div class="pf-notes">📝 ${this._escapeHtml(profile.notes)}</div>`
-      : '';
+    // 紧凑标签
+    const tags = [];
+    if (profile.relationship) tags.push(`<span class="pf-tag relation">${this._escapeHtml(profile.relationship)}</span>`);
+    if (profile.mbti) tags.push(`<span class="pf-tag mbti">${this._escapeHtml(profile.mbti)}</span>`);
+    if (profile.zodiac) tags.push(`<span class="pf-tag zodiac">${this._escapeHtml(profile.zodiac)}</span>`);
+    if (profile.age) tags.push(`<span class="pf-tag">${this._escapeHtml(profile.age)}岁</span>`);
+    if (profile.personality) tags.push(`<span class="pf-tag">${this._escapeHtml(profile.personality)}</span>`);
 
     this._dom.profileArea.innerHTML = `
-      <div class="profile-card">
-        <div class="pf-avatar">👤</div>
-        <div class="pf-name">${this._escapeHtml(profile.name)}</div>
-        ${subtitle ? `<div class="pf-sub">${this._escapeHtml(subtitle)}</div>` : ''}
-        <div class="pf-grid">${gridItems.join('')}</div>
-        ${notesHtml}
-        <button class="pf-edit-btn" id="btnEditProfile">编辑画像</button>
+      <div class="profile-card" id="profileCard">
+        <div class="pf-row">
+          <div class="pf-avatar">👤</div>
+          <div class="pf-info">
+            <div class="pf-name">${this._escapeHtml(profile.name)}</div>
+            <div class="pf-tags">${tags.join('')}</div>
+          </div>
+          <span class="pf-edit-icon">✎</span>
+        </div>
       </div>`;
-    document.getElementById('btnEditProfile').addEventListener('click', () => this._openProfileModal());
+    document.getElementById('profileCard').addEventListener('click', () => this._openProfileModal());
   },
 
   _openProfileModal() {
