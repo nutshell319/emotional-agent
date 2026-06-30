@@ -289,6 +289,78 @@ const StorageManager = {
 };
 
 /* ========================================
+   SafetyGuard — 领域预检 + 危机检测
+   ======================================== */
+const SafetyGuard = {
+  // 非情感领域关键词（命中则拒绝，0 token消耗）
+  DOMAIN_BLOCK_LIST: [
+    // 技术/编程
+    '代码', '编程', 'bug', 'debug', '前端', '后端', '数据库', 'API', '服务器',
+    'python', 'java', 'javascript', 'html', 'css', 'react', 'vue', 'node',
+    '编译器', '算法', '数据结构', 'linux', 'windows', 'docker', 'git',
+    '函数', '类', '对象', '数组', '字符串', '正则', '命令行',
+    // 数学/科学
+    '数学题', '方程式', '微积分', '物理', '化学', '生物', '几何',
+    '证明', '定理', '概率', '统计',
+    // 政治/宗教
+    '政治', '选举', '党派', '政府', '宗教', '信仰', '教义',
+    // 通用非情感
+    '翻译', '写文章', '改写', '润色', '总结一下',
+  ],
+
+  // 情感领域关键词（白名单强化）
+  DOMAIN_ALLOW_LIST: [
+    '感情', '恋爱', '分手', '喜欢', '爱', '暗恋', '表白', '情侣', '伴侣',
+    '婚姻', '夫妻', '吵架', '冷战', '矛盾', '冲突', '出轨', '劈腿', '前任',
+    '沟通', '情绪', '心情', '难过', '伤心', '生气', '焦虑', '委屈', '失落',
+    '朋友', '家人', '父母', '同事', '人际关系', '相处', '孤独', '寂寞',
+    '暧昧', '相亲', '异地', '复合', '挽回', '放不下', '吃醋', '安全感',
+    '婆媳', '闺蜜', '兄弟', '室友',
+  ],
+
+  /** 判断是否为情感领域问题。返回 { allowed: bool, reason: string } */
+  checkDomain(userInput) {
+    const text = userInput.toLowerCase();
+
+    // 优先检查白名单 — 命中任何一个即放行
+    for (const kw of this.DOMAIN_ALLOW_LIST) {
+      if (text.includes(kw)) return { allowed: true, reason: '' };
+    }
+
+    // 检查黑名单
+    for (const kw of this.DOMAIN_BLOCK_LIST) {
+      if (text.includes(kw.toLowerCase())) {
+        return {
+          allowed: false,
+          reason: '抱歉，我是情感沟通助手，只能帮你解答感情和人际关系方面的问题。如果有情感方面的困扰，随时找我聊聊。',
+        };
+      }
+    }
+
+    // 既不在白名单也不在黑名单 → 放行（可能是情感相关的开放式提问）
+    return { allowed: true, reason: '' };
+  },
+
+  // 危机关键词 → 安全响应模式
+  CRISIS_PATTERNS: [
+    { keywords: ['自杀', '不想活', '结束生命', '自残', '自伤', '割腕', '跳楼', '安眠药'],
+      response: '我听到你说的这些，非常担心你的安全。请你立即拨打**全国心理援助热线 400-161-9995**（24小时免费），有专业的心理咨询师可以帮助你。我只是一个AI助手，无法提供危机干预，但请你务必联系专业人士。你的生命非常宝贵。' },
+    { keywords: ['家暴', '被打', '挨打', '虐待', '殴打'],
+      response: '如果正在经历暴力，你的安全是第一位的。请拨打**全国妇联维权热线 12338**或**报警 110**寻求帮助。我建议你不要独自处理，联系信任的亲友或专业机构。' },
+  ],
+
+  /** 检查是否触发危机响应。返回危机响应文本，或 null 表示未触发 */
+  checkCrisis(userInput) {
+    for (const pattern of this.CRISIS_PATTERNS) {
+      for (const kw of pattern.keywords) {
+        if (userInput.includes(kw)) return pattern.response;
+      }
+    }
+    return null;
+  },
+};
+
+/* ========================================
    INIT — 页面加载入口（后续任务填充）
    ======================================== */
 document.addEventListener('DOMContentLoaded', () => {
