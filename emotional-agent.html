@@ -224,8 +224,12 @@ input, textarea {
   z-index: 5;
 }
 .main-area.is-empty .profile-area {
-  position: absolute; top: 60px; left: 20px; right: 20px;
-  z-index: 5;
+  width: 600px;
+  max-width: calc(100% - 40px);
+  margin-bottom: 0;
+}
+.main-area.is-empty .profile-card-empty {
+  margin: 0 0 16px 0;
 }
 .main-area.is-empty .chat-messages {
   flex: 0 0 auto;
