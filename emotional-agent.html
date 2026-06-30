@@ -333,7 +333,24 @@ input, textarea {
 .msg-row.user .msg-avatar {
   width: 40px; height: 40px;
   font-size: 20px;
-  background: rgba(255,255,255,0.08);
+  background: linear-gradient(135deg, #4e6482, #354860);
+  position: relative;
+}
+.msg-row.user .msg-avatar::before {
+  content: '';
+  position: absolute;
+  width: 14px; height: 14px;
+  border-radius: 50%;
+  background: #9ab8d8;
+  top: 7px; left: 50%; transform: translateX(-50%);
+}
+.msg-row.user .msg-avatar::after {
+  content: '';
+  position: absolute;
+  width: 22px; height: 14px;
+  border-radius: 11px 11px 3px 3px;
+  background: #9ab8d8;
+  bottom: 7px; left: 50%; transform: translateX(-50%);
 }
 .msg-row.agent .msg-avatar {
   width: 36px; height: 36px;
@@ -576,16 +593,26 @@ input, textarea {
   width: 36px; height: 36px;
   border-radius: 50%;
   flex-shrink: 0;
-  background: linear-gradient(135deg, #5a5a6e, #3e3e52);
+  background: linear-gradient(135deg, #4e6482, #354860);
   display: flex; align-items: center; justify-content: center;
   font-size: 18px;
   position: relative;
 }
+.profile-card .pf-avatar::before {
+  content: '';
+  position: absolute;
+  width: 11px; height: 11px;
+  border-radius: 50%;
+  background: #9ab8d8;
+  top: 6px; left: 50%; transform: translateX(-50%);
+}
 .profile-card .pf-avatar::after {
   content: '';
-  width: 14px; height: 14px;
-  border-radius: 50%;
-  background: #8a8a9a;
+  position: absolute;
+  width: 18px; height: 11px;
+  border-radius: 9px 9px 2px 2px;
+  background: #9ab8d8;
+  bottom: 6px; left: 50%; transform: translateX(-50%);
 }
 .profile-card .pf-info { flex: 1; min-width: 0; }
 .profile-card .pf-name {
@@ -1754,7 +1781,7 @@ const UIController = {
     const row = document.createElement('div');
     row.className = 'msg-row user';
     row.innerHTML = `
-      <div class="msg-avatar">👤</div>
+      <div class="msg-avatar"></div>
       <div>
         <div class="msg-bubble">${this._escapeHtml(msg.content)}</div>
         <div class="msg-time">${this._formatTime(msg.timestamp)}</div>
