@@ -215,6 +215,19 @@ input, textarea {
   height: 100%;
   min-width: 0;
 }
+.main-area.is-empty .chat-messages {
+  flex: 0;
+  display: flex; align-items: center; justify-content: center;
+}
+.main-area.is-empty .chat-input-area {
+  max-width: 600px;
+  width: 100%;
+  margin: 20px auto;
+  border-top: none;
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 14px;
+  background: rgba(255,255,255,0.02);
+}
 
 .chat-header-bar {
   padding: 12px 20px;
@@ -1418,6 +1431,7 @@ const UIController = {
       settingsOverlay: document.getElementById('settingsOverlay'),
       toastContainer: document.getElementById('toastContainer'),
       profileArea: document.getElementById('profileArea'),
+      mainArea: document.getElementById('mainArea'),
     };
 
     this._bindEvents();
@@ -1602,7 +1616,7 @@ const UIController = {
     this._dom.profileArea.innerHTML = `
       <div class="profile-card">
         <div class="profile-card-header">
-          <span class="profile-card-title">👤 对象画像</span>
+          <span class="profile-card-title">👤 ${this._escapeHtml(profile.name)}</span>
           <button class="profile-card-edit" id="btnEditProfile">编辑</button>
         </div>
         <div class="profile-card-body">${tags.join('')}</div>
@@ -1685,10 +1699,12 @@ const UIController = {
 
     if (!chat || chat.messages.length === 0) {
       this._dom.emptyState.style.display = 'flex';
+      this._dom.mainArea.classList.add('is-empty');
       return;
     }
 
     this._dom.emptyState.style.display = 'none';
+    this._dom.mainArea.classList.remove('is-empty');
     const fragment = document.createDocumentFragment();
 
     chat.messages.forEach((msg, idx) => {
