@@ -318,17 +318,18 @@ input, textarea {
 .msg-row {
   display: flex;
   gap: 10px;
+  align-items: flex-end;
   animation: msgIn 0.35s ease;
 }
 @keyframes msgIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 .msg-row.user { flex-direction: row-reverse; }
+
 .msg-avatar {
   width: 30px; height: 30px;
   border-radius: 50%;
   flex-shrink: 0;
   display: flex; align-items: center; justify-content: center;
   font-size: 14px;
-  margin-top: 2px;
 }
 .msg-row.user .msg-avatar {
   width: 40px; height: 40px;
@@ -357,35 +358,67 @@ input, textarea {
   font-size: 18px;
   background: linear-gradient(135deg, #d4a0ff, #f28b9f);
 }
+
+/* 内容包裹层 — 防止flex撑开 */
+.msg-content {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: calc(100% - 52px);
+}
+
 .msg-bubble {
-  max-width: 72%;
-  padding: 10px 16px;
-  border-radius: 16px;
+  padding: 10px 14px;
+  border-radius: 14px;
   font-size: 14px;
   line-height: 1.65;
   white-space: pre-wrap;
   word-break: break-word;
+  position: relative;
 }
 .msg-row.user .msg-bubble {
-  background: rgba(185,142,255,0.12);
+  background: rgba(185,142,255,0.15);
+  border: 1px solid rgba(185,142,255,0.12);
   border-bottom-right-radius: 4px;
   color: var(--text);
 }
 .msg-row.agent .msg-bubble {
-  background: rgba(255,255,255,0.04);
-  border: 1px solid var(--card-border);
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.08);
   border-bottom-left-radius: 4px;
   color: var(--text);
 }
+
+/* 气泡尾巴 */
+.msg-row.agent .msg-bubble::before {
+  content: '';
+  position: absolute;
+  left: -5px; bottom: 8px;
+  border: 5px solid transparent;
+  border-right-color: rgba(255,255,255,0.05);
+  border-left: 0;
+}
+.msg-row.user .msg-bubble::after {
+  content: '';
+  position: absolute;
+  right: -5px; bottom: 8px;
+  border: 5px solid transparent;
+  border-left-color: rgba(185,142,255,0.15);
+  border-right: 0;
+}
+/* streaming 光标覆盖尾巴伪元素 */
+.msg-row.agent .msg-bubble.streaming::before { display: none; }
 .msg-row.agent .msg-bubble.streaming::after {
   content: ' ▌';
+  position: static;
   animation: blink 0.8s infinite;
   color: var(--title);
+  border: none;
 }
+
 .msg-time {
   font-size: 10px;
   color: var(--text-muted);
-  margin-top: 4px;
+  margin-top: 3px;
   padding: 0 4px;
 }
 .msg-row.user .msg-time { text-align: right; }
@@ -406,6 +439,8 @@ input, textarea {
 .msg-row.error .msg-bubble {
   border: 1px solid rgba(232,93,117,0.3) !important;
 }
+.msg-row.error .msg-bubble::before,
+.msg-row.error .msg-bubble::after { display: none; }
 .msg-actions {
   display: flex; gap: 8px; margin-top: 6px;
 }
@@ -1783,7 +1818,7 @@ const UIController = {
     row.className = 'msg-row user';
     row.innerHTML = `
       <div class="msg-avatar"></div>
-      <div>
+      <div class="msg-content">
         <div class="msg-bubble">${this._escapeHtml(msg.content)}</div>
         <div class="msg-time">${this._formatTime(msg.timestamp)}</div>
       </div>`;
@@ -1795,7 +1830,7 @@ const UIController = {
     row.className = 'msg-row agent';
     row.innerHTML = `
       <div class="msg-avatar">👧🏻</div>
-      <div>
+      <div class="msg-content">
         <div class="msg-bubble">${this._escapeHtml(msg.content)}</div>
         <div class="msg-time">${this._formatTime(msg.timestamp)}</div>
         ${wasInterrupted ? '<span class="continue-hint" data-action="continue">点击继续生成 →</span>' : ''}
@@ -1821,7 +1856,7 @@ const UIController = {
     row.id = 'typingIndicator';
     row.innerHTML = `
       <div class="msg-avatar">👧🏻</div>
-      <div>
+      <div class="msg-content">
         <div class="msg-bubble">
           <div class="typing-indicator">
             <div class="typing-dot"></div>
@@ -1861,7 +1896,7 @@ const UIController = {
           row.className = 'msg-row agent';
           row.innerHTML = `
             <div class="msg-avatar">👧🏻</div>
-            <div>
+            <div class="msg-content">
               <div class="msg-bubble streaming"></div>
             </div>`;
           this._streamingBubble = row.querySelector('.msg-bubble');
@@ -1888,7 +1923,7 @@ const UIController = {
         row.className = 'msg-row agent error';
         row.innerHTML = `
           <div class="msg-avatar">👧🏻</div>
-          <div>
+          <div class="msg-content">
             <div class="msg-bubble">${this._escapeHtml(err.userMessage || err.message)}</div>
             <div class="msg-actions">
               <button class="retry-btn" data-action="retry">重新发送</button>
