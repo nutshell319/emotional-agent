@@ -12,7 +12,7 @@
 ## 项目结构
 
 ```
-emotional-agent.html    — 主程序（单文件，CSS/JS 内联）
+index.html              — 主程序（单文件，CSS/JS 内联）
 CLAUDE.md               — 本文件
 ```
 
