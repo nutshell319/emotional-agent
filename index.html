@@ -767,6 +767,110 @@ input, textarea {
   background: transparent; color: var(--text-dim);
   font-size: 13px; cursor: pointer;
 }
+
+/* ========================================
+   User Profile Card — 侧边栏我的画像
+   ======================================== */
+.user-profile-area { flex-shrink: 0; }
+.user-profile-card {
+  margin: 0 8px 4px 8px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(255,255,255,0.08);
+  background: rgba(255,255,255,0.02);
+  cursor: pointer;
+  transition: all 0.15s;
+  animation: slideIn 0.25s ease;
+}
+.user-profile-card:hover {
+  border-color: rgba(255,255,255,0.15);
+  background: rgba(255,255,255,0.04);
+}
+.user-profile-card .pf-row {
+  display: flex; align-items: center; gap: 10px;
+}
+.user-profile-card .pf-avatar {
+  width: 36px; height: 36px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: linear-gradient(135deg, #d4b8e8, #b98eff);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 16px;
+}
+.user-profile-card .pf-info { flex: 1; min-width: 0; }
+.user-profile-card .pf-name {
+  font-size: 13px; font-weight: 600; color: var(--text);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.user-profile-card .pf-sub {
+  font-size: 10px; color: var(--text-muted);
+  margin-top: 1px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.user-profile-card .pf-edit-icon {
+  font-size: 12px; color: var(--text-muted);
+  opacity: 0; transition: opacity 0.15s;
+  flex-shrink: 0;
+}
+.user-profile-card:hover .pf-edit-icon { opacity: 1; }
+
+.user-profile-card-empty {
+  margin: 0 8px 4px 8px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1px dashed rgba(255,255,255,0.06);
+  font-size: 11px; color: var(--text-muted);
+  text-align: center; cursor: pointer;
+  transition: all 0.15s;
+  animation: slideIn 0.25s ease;
+}
+.user-profile-card-empty:hover {
+  border-color: rgba(255,255,255,0.15);
+  color: #ccc;
+}
+
+/* User memory facts list in modal */
+.user-facts-section {
+  border-top: 1px solid rgba(255,255,255,0.06);
+  padding-top: 12px;
+}
+.user-facts-section .facts-header {
+  font-size: 12px; color: var(--text-dim);
+  letter-spacing: 1px;
+  margin-bottom: 8px;
+}
+.user-facts-section .fact-item {
+  display: flex; align-items: center; gap: 6px;
+  padding: 4px 6px;
+  border-radius: 6px;
+  font-size: 12px; color: var(--text-dim);
+  transition: background 0.15s;
+}
+.user-facts-section .fact-item:hover { background: rgba(255,255,255,0.03); }
+.user-facts-section .fact-item .fact-text {
+  flex: 1;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.user-facts-section .fact-item .fact-del {
+  width: 20px; height: 20px;
+  border-radius: 4px;
+  background: transparent; color: var(--text-muted);
+  font-size: 12px;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  opacity: 0; transition: all 0.15s;
+}
+.user-facts-section .fact-item:hover .fact-del { opacity: 1; }
+.user-facts-section .fact-item .fact-del:hover {
+  background: rgba(232,93,117,0.12);
+  color: var(--accent);
+}
+.user-facts-section .facts-empty {
+  font-size: 11px; color: var(--text-muted);
+  font-style: italic;
+  padding: 4px 6px;
+}
 .pf-btn-cancel:hover { color: var(--text); }
 .pf-btn-save {
   padding: 8px 20px; border-radius: 8px;
@@ -790,6 +894,7 @@ input, textarea {
       </div>
       <button class="sidebar-btn" id="btnNewChat" title="新对话 (Ctrl+N)">＋</button>
     </div>
+    <div class="user-profile-area" id="userProfileArea"></div>
     <div class="profile-area" id="profileArea"></div>
     <div class="chat-list" id="chatList"></div>
     <div class="sidebar-footer">
@@ -955,6 +1060,7 @@ const SettingsManager = {
    ======================================== */
 const StorageManager = {
   CHATS_KEY: 'emotion-agent:chats',
+  USER_MEMORY_KEY: 'emotion-agent:user-memory',
 
   /** 获取所有会话列表（按更新时间倒序） */
   getAllChats() {
@@ -1013,6 +1119,7 @@ const StorageManager = {
       exportedAt: new Date().toISOString(),
       chats: this.getAllChats(),
       settings: SettingsManager.getAll(),
+      userMemory: this.getUserMemory(),
     };
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
@@ -1044,6 +1151,23 @@ const StorageManager = {
           if (data.settings) {
             SettingsManager.update(data.settings);
           }
+          if (data.userMemory && data.userMemory.facts) {
+            // 导入用户记忆，与现有记忆合并
+            UserMemoryManager.mergeFacts(data.userMemory.facts || []);
+            if (data.userMemory.name) {
+              const existing = UserMemoryManager.get();
+              if (!existing.name) {
+                UserMemoryManager.updateProfile({
+                  name: data.userMemory.name,
+                  mbti: data.userMemory.mbti || '',
+                  zodiac: data.userMemory.zodiac || '',
+                  age: data.userMemory.age || '',
+                  personality: data.userMemory.personality || '',
+                  notes: data.userMemory.notes || '',
+                });
+              }
+            }
+          }
           resolve(newChats.length);
         } catch (err) {
           reject(err.message === 'INVALID_FORMAT'
@@ -1054,6 +1178,189 @@ const StorageManager = {
       reader.onerror = () => reject(new Error('文件读取失败'));
       reader.readAsText(file);
     });
+  },
+
+  /** 获取用户记忆（全局单例） */
+  getUserMemory() {
+    try {
+      const raw = localStorage.getItem(this.USER_MEMORY_KEY);
+      return raw ? JSON.parse(raw) : {
+        name: '',
+        mbti: '',
+        zodiac: '',
+        age: '',
+        personality: '',
+        notes: '',
+        facts: [],
+        lastExtractedAt: null,
+      };
+    } catch (e) {
+      console.error('[StorageManager] 读取用户记忆失败:', e);
+      return { name: '', mbti: '', zodiac: '', age: '', personality: '', notes: '', facts: [], lastExtractedAt: null };
+    }
+  },
+
+  /** 保存用户记忆 */
+  saveUserMemory(memory) {
+    try {
+      localStorage.setItem(this.USER_MEMORY_KEY, JSON.stringify(memory));
+    } catch (e) {
+      if (e.name === 'QuotaExceededError') throw new Error('STORAGE_FULL');
+      throw e;
+    }
+  },
+};
+
+/* ========================================
+   UserMemoryManager — 用户记忆提取与管理
+   ======================================== */
+const UserMemoryManager = {
+  /** 获取当前用户记忆 */
+  get() {
+    return StorageManager.getUserMemory();
+  },
+
+  /** 保存用户记忆 */
+  save(memory) {
+    StorageManager.saveUserMemory(memory);
+  },
+
+  /** 更新用户填写的画像字段 */
+  updateProfile(data) {
+    const memory = this.get();
+    memory.name = data.name || '';
+    memory.mbti = data.mbti || '';
+    memory.zodiac = data.zodiac || '';
+    memory.age = data.age || '';
+    memory.personality = data.personality || '';
+    memory.notes = data.notes || '';
+    this.save(memory);
+  },
+
+  /** 合并新提取的事实（按 content 去重） */
+  mergeFacts(newFacts) {
+    const memory = this.get();
+    const existingContents = new Set(memory.facts.map(f => f.content));
+    const added = [];
+    newFacts.forEach(f => {
+      if (!existingContents.has(f.content)) {
+        f.id = crypto.randomUUID ? crypto.randomUUID() : 'fact-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6);
+        f.timestamp = new Date().toISOString();
+        f.source = f.source || 'extracted';
+        memory.facts.push(f);
+        added.push(f);
+      }
+    });
+    // 最多保留 30 条，旧的在前
+    if (memory.facts.length > 30) {
+      memory.facts = memory.facts.slice(-30);
+    }
+    if (added.length > 0) {
+      memory.lastExtractedAt = new Date().toISOString();
+      this.save(memory);
+    }
+    return added.length;
+  },
+
+  /** 删除单条事实 */
+  deleteFact(factId) {
+    const memory = this.get();
+    memory.facts = memory.facts.filter(f => f.id !== factId);
+    this.save(memory);
+  },
+
+  /** 构建用于注入 System Prompt 的用户记忆文本 */
+  buildContextInjection() {
+    const m = this.get();
+    const hasProfile = m.name || m.mbti || m.zodiac || m.personality;
+    const hasFacts = m.facts.length > 0;
+    if (!hasProfile && !hasFacts) return '';
+
+    let text = '\n\n[用户画像 — 关于正在跟你聊天的这个人]';
+    if (m.name) text += '\n称呼：' + m.name;
+    if (m.mbti) text += ' | MBTI：' + m.mbti;
+    if (m.zodiac) text += ' | 星座：' + m.zodiac;
+    if (m.age) text += ' | 年龄：' + m.age;
+    if (m.personality) text += '\n自述性格：' + m.personality;
+    if (m.notes) text += '\n补充：' + m.notes;
+
+    if (hasFacts) {
+      text += '\n\n已了解的事实（从聊天中自动提取，仅供参考）：';
+      m.facts.forEach(f => {
+        text += '\n• ' + f.content;
+      });
+    }
+
+    text += '\n\n使用方式：了解用户本身有助于你给出更贴合TA个人情况的建议。但不要刻意复述这些事实——自然地运用在分析和共情中。';
+
+    return text;
+  },
+
+  /** 构建事实提取 prompt */
+  buildExtractionPrompt(chatMessages) {
+    // 只取用户消息用于提取
+    const userMessages = chatMessages.filter(m => m.role === 'user').map(m => m.content);
+    const recentMsgs = userMessages.slice(-10).join('\n---\n');
+
+    return '你是一个用户画像提取器。从以下对话中提取关于"用户自己"的关键事实。\n\n只提取用户明确透露的关于自己的信息，比如：\n- 依恋风格（焦虑型/回避型/安全型）\n- 重要经历（分手时间、感情历史）\n- 性格特征（敏感、容易焦虑、不擅表达）\n- 感情需求（需要安全感、害怕冲突）\n- 行为模式（一吵架就冷战、习惯性忍让）\n\n不要提取关于"对方/对象"的信息——那些属于对象画像。\n\n输出格式：每行一条事实，用 "- " 开头。每条事实简洁明确，不超过20个字。\n如果没有发现新事实，输出 "无"。\n\n对话内容：\n---\n' + recentMsgs + '\n---\n\n用户关键事实：';
+  },
+
+  /** 异步提取事实 */
+  async extractFacts(chatId) {
+    const settings = SettingsManager.getAll();
+    if (!settings.apiKey) return; // 没有 API key 就跳过
+
+    const chat = StorageManager.getChat(chatId);
+    if (!chat || chat.messages.length === 0) return;
+
+    const prompt = this.buildExtractionPrompt(chat.messages);
+
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
+
+      const response = await fetch(settings.baseURL + '/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + settings.apiKey,
+        },
+        body: JSON.stringify({
+          model: settings.model,
+          messages: [{ role: 'user', content: prompt }],
+          temperature: 0.3,
+          max_tokens: 500,
+          stream: false,
+        }),
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!response.ok) return;
+
+      const data = await response.json();
+      const content = data.choices?.[0]?.message?.content || '';
+
+      // 解析提取结果
+      const facts = [];
+      const lines = content.split('\n');
+      lines.forEach(line => {
+        const trimmed = line.trim();
+        if (trimmed.startsWith('- ') || trimmed.startsWith('• ')) {
+          const fact = trimmed.replace(/^[-•]\s*/, '').trim();
+          if (fact && fact !== '无' && fact.length <= 50) {
+            facts.push({ content: fact, category: 'extracted', source: chatId, confidence: 'medium' });
+          }
+        }
+      });
+
+      if (facts.length > 0) {
+        this.mergeFacts(facts);
+      }
+    } catch (_) {
+      // 提取失败静默忽略，不影响主流程
+    }
   },
 };
 
@@ -1411,6 +1718,12 @@ const ChatManager = {
       context[0].content += `\n\n[历史背景：${chat.summary}]`;
     }
 
+    // 注入用户记忆（全局持久，先于对象画像）
+    const userMemoryText = UserMemoryManager.buildContextInjection();
+    if (userMemoryText) {
+      context[0].content += userMemoryText;
+    }
+
     // 注入对象画像 — 人格适应：模型必须以适配对方人格的方式沟通
     if (chat.subjectProfile && chat.subjectProfile.name) {
       const p = chat.subjectProfile;
@@ -1571,6 +1884,21 @@ const ChatManager = {
           });
           StorageManager.saveChat(chat);
         }
+        // 触发用户记忆提取（累计 >= 5 条用户消息且距上次提取 > 10 分钟）
+        const userMsgCount = chat.messages.filter(m => m.role === 'user').length;
+        if (userMsgCount >= 5) {
+          const memory = UserMemoryManager.get();
+          const lastExtracted = memory.lastExtractedAt ? new Date(memory.lastExtractedAt) : null;
+          const elapsed = lastExtracted ? (Date.now() - lastExtracted.getTime()) : Infinity;
+          if (elapsed > 10 * 60 * 1000) {
+            // 延迟执行，不阻塞 UI
+            setTimeout(() => {
+              UserMemoryManager.extractFacts(chat.id).then(() => {
+                UIController._renderUserProfileCard();
+              });
+            }, 2000);
+          }
+        }
         onAgentDone();
       },
       onError: (err) => {
@@ -1663,6 +1991,7 @@ const UIController = {
       settingsPanel: document.getElementById('settingsPanel'),
       settingsOverlay: document.getElementById('settingsOverlay'),
       toastContainer: document.getElementById('toastContainer'),
+      userProfileArea: document.getElementById('userProfileArea'),
       profileArea: document.getElementById('profileArea'),
       mainArea: document.getElementById('mainArea'),
     };
@@ -1818,7 +2147,132 @@ const UIController = {
     StorageManager.saveAllChats([]);
     ChatManager._currentChatId = null;
     this._renderSidebar();
+    this._renderUserProfileCard();
     this._newChat();
+  },
+
+  /* ---- 用户画像（全局持久） ---- */
+  _renderUserProfileCard() {
+    const memory = UserMemoryManager.get();
+    const hasProfile = memory.name || memory.mbti || memory.personality;
+
+    if (!hasProfile) {
+      this._dom.userProfileArea.innerHTML = `
+        <div class="user-profile-card-empty" id="userProfileEmpty">
+          ＋ 设置我的画像
+        </div>`;
+      document.getElementById('userProfileEmpty').addEventListener('click', () => this._openUserProfileModal());
+      return;
+    }
+
+    const tags = [];
+    if (memory.mbti) tags.push('<span class="pf-tag mbti">' + this._escapeHtml(memory.mbti) + '</span>');
+    if (memory.zodiac) tags.push('<span class="pf-tag zodiac">' + this._escapeHtml(memory.zodiac) + '</span>');
+    if (memory.age) tags.push('<span class="pf-tag">' + this._escapeHtml(memory.age) + '岁</span>');
+
+    const factCount = memory.facts.length;
+    const subText = tags.length > 0 ? tags.join('') : (factCount > 0 ? factCount + '条记忆' : '');
+
+    this._dom.userProfileArea.innerHTML = `
+      <div class="user-profile-card" id="userProfileCard">
+        <div class="pf-row">
+          <div class="pf-avatar">👤</div>
+          <div class="pf-info">
+            <div class="pf-name">${this._escapeHtml(memory.name || '我')}</div>
+            ${subText ? '<div class="pf-sub">' + subText + '</div>' : ''}
+          </div>
+          <span class="pf-edit-icon">✎</span>
+        </div>
+      </div>`;
+    document.getElementById('userProfileCard').addEventListener('click', () => this._openUserProfileModal());
+  },
+
+  _openUserProfileModal() {
+    const memory = UserMemoryManager.get();
+
+    const overlay = document.createElement('div');
+    overlay.className = 'profile-modal-overlay';
+    overlay.id = 'userProfileModalOverlay';
+    let factsHTML = '';
+    if (memory.facts.length > 0) {
+      factsHTML = '<div class="user-facts-section"><div class="facts-header">自动提取的记忆</div>';
+      memory.facts.forEach(f => {
+        factsHTML += '<div class="fact-item" data-fact-id="' + f.id + '"><span class="fact-text">' + this._escapeHtml(f.content) + '</span><button class="fact-del" title="删除">×</button></div>';
+      });
+      factsHTML += '</div>';
+    } else {
+      factsHTML = '<div class="user-facts-section"><div class="facts-header">自动提取的记忆</div><div class="facts-empty">暂无自动提取的记忆，多聊几天就有了</div></div>';
+    }
+
+    overlay.innerHTML = `
+      <div class="profile-modal">
+        <h3>编辑我的画像</h3>
+        <div class="settings-group">
+          <label>称呼</label>
+          <input class="pf-input" id="upfName" value="${this._escapeHtml(memory.name || '')}" placeholder="你怎么称呼自己？">
+        </div>
+        <div class="settings-group">
+          <label>MBTI</label>
+          <input class="pf-input" id="upfMbti" value="${this._escapeHtml(memory.mbti || '')}" placeholder="比如：INFP、ESTJ">
+        </div>
+        <div class="settings-group">
+          <label>星座</label>
+          <input class="pf-input" id="upfZodiac" value="${this._escapeHtml(memory.zodiac || '')}" placeholder="比如：双子座、天蝎座">
+        </div>
+        <div class="settings-group">
+          <label>年龄</label>
+          <input class="pf-input" id="upfAge" value="${this._escapeHtml(memory.age || '')}" placeholder="比如：25">
+        </div>
+        <div class="settings-group">
+          <label>性格特点</label>
+          <input class="pf-input" id="upfPersonality" value="${this._escapeHtml(memory.personality || '')}" placeholder="比如：内向敏感、容易焦虑">
+        </div>
+        <div class="settings-group">
+          <label>补充说明</label>
+          <textarea class="pf-input pf-textarea" id="upfNotes" placeholder="其他你希望助手了解你的背景...">${this._escapeHtml(memory.notes || '')}</textarea>
+        </div>
+        ${factsHTML}
+        <div class="profile-modal-actions">
+          <button class="pf-btn-cancel" id="upfCancel">取消</button>
+          <button class="pf-btn-save" id="upfSave">保存画像</button>
+        </div>
+      </div>`;
+
+    document.body.appendChild(overlay);
+
+    const close = () => overlay.remove();
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
+    document.getElementById('upfCancel').addEventListener('click', close);
+
+    // 删除事实按钮
+    overlay.querySelectorAll('.fact-del').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const factId = btn.parentElement.dataset.factId;
+        UserMemoryManager.deleteFact(factId);
+        this._renderUserProfileCard();
+        // 刷新模态中的事实列表
+        close();
+        this._openUserProfileModal();
+        this._showToast('记忆已删除', 'success');
+      });
+    });
+
+    document.getElementById('upfSave').addEventListener('click', () => {
+      const data = {
+        name: document.getElementById('upfName').value.trim(),
+        mbti: document.getElementById('upfMbti').value.trim(),
+        zodiac: document.getElementById('upfZodiac').value.trim(),
+        age: document.getElementById('upfAge').value.trim(),
+        personality: document.getElementById('upfPersonality').value.trim(),
+        notes: document.getElementById('upfNotes').value.trim(),
+      };
+      UserMemoryManager.updateProfile(data);
+      this._renderUserProfileCard();
+      close();
+      this._showToast('画像已保存，所有对话都会自动引用', 'success');
+    });
+    document.getElementById('upfName').focus();
   },
 
   /* ---- 对象画像 ---- */
