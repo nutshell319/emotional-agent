@@ -1999,6 +1999,7 @@ const UIController = {
     this._bindEvents();
     this._bindSettingsEvents();
     this._loadSettingsToForm();
+    this._renderUserProfileCard();  // 用户画像全局持久，只渲染一次
     this._renderSidebar();
     this._loadLastChat();
     this._checkFirstRun();
