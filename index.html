@@ -1406,17 +1406,23 @@ const ChatManager = {
       context[0].content += `\n\n[历史背景：${chat.summary}]`;
     }
 
-    // 注入对象画像
+    // 注入对象画像 — 要求模型以画像为核心基准进行个性化回复
     if (chat.subjectProfile && chat.subjectProfile.name) {
       const p = chat.subjectProfile;
-      let profileText = '\n\n[对象画像 — 请针对此画像进行个性化分析和建议]\n';
-      if (p.name) profileText += `称呼：${p.name}`;
-      if (p.mbti) profileText += ` | MBTI：${p.mbti}`;
-      if (p.zodiac) profileText += ` | 星座：${p.zodiac}`;
-      if (p.age) profileText += ` | 年龄：${p.age}`;
-      if (p.relationship) profileText += `\n关系状态：${p.relationship}`;
-      if (p.personality) profileText += `\n性格特点：${p.personality}`;
-      if (p.notes) profileText += `\n补充说明：${p.notes}`;
+      let profileText = '\n\n---\n[核心上下文：用户正在跟你聊关于"' + p.name + '"的感情问题。以下是TA的对象画像，你必须在回复中结合这些信息给出个性化分析和建议，而不是泛泛而谈]\n\n';
+      profileText += '对方称呼：' + p.name;
+      if (p.relationship) profileText += '，' + p.relationship;
+      profileText += '\n';
+      if (p.mbti) profileText += 'MBTI类型：' + p.mbti + '（分析问题时结合TA的认知功能偏好，比如INFP用Fi主导，ISTJ用Si主导）\n';
+      if (p.zodiac) profileText += '星座：' + p.zodiac + '（可作为性格倾向参考，不要太刻板）\n';
+      if (p.age) profileText += '年龄：' + p.age + '岁\n';
+      if (p.personality) profileText += '性格描述：' + p.personality + '\n';
+      if (p.notes) profileText += '补充背景：' + p.notes + '\n';
+      profileText += '\n使用规则（重要）：\n';
+      profileText += '1. 每次分析都要联系画像特征，比如"你对象是' + (p.mbti || '这个性格') + '，这类人通常..."或"' + p.name + '是' + (p.zodiac || '这个星座') + '，TA可能在意的点是..."\n';
+      profileText += '2. 给沟通建议时要针对TA的性格调整——对内向的人和对开朗的人，开口方式完全不同\n';
+      profileText += '3. 自然地融入，不要逐条复述画像内容。画像信息是你的分析依据，不是需要罗列的清单\n';
+      profileText += '4. 用户说的问题如果和画像特征吻合（比如INFP的回避倾向），要明确指出来，帮用户理解这可能是性格使然而非针对TA\n';
       context[0].content += profileText;
     }
 
