@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>小暖 — 情感沟通助手</title>
+<title>小心</title>
 <style>
 /* ========================================
    CSS Reset & Variables
@@ -857,7 +857,7 @@ input, textarea {
     <div class="sidebar-header">
       <div class="sidebar-logo">
         <span class="logo-icon" id="sidebarLogoIcon">👧🏻</span>
-        <span id="sidebarLogoName">小暖</span>
+        <span id="sidebarLogoName">小心</span>
       </div>
       <button class="sidebar-btn" id="btnNewChat" title="新对话 (Ctrl+N)">＋</button>
     </div>
@@ -902,7 +902,7 @@ input, textarea {
 
       <div class="settings-group">
         <label>助手昵称</label>
-        <input class="settings-input" id="settingAgentName" placeholder="小暖">
+        <input class="settings-input" id="settingAgentName" placeholder="小心">
         <span class="settings-hint">给助手起个你喜欢的名字</span>
       </div>
 
@@ -970,7 +970,7 @@ const SettingsManager = {
     baseURL: 'https://api.deepseek.com',
     model: 'deepseek-v4-flash',
     temperature: 0.7,
-    agentName: '小暖',
+    agentName: '小心',
   },
 
   _cache: null,
@@ -1092,7 +1092,7 @@ const StorageManager = {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    const exportName = SettingsManager.getAll().agentName || '小暖';
+    const exportName = SettingsManager.getAll().agentName || '小心';
     a.download = `${exportName}-对话备份-${new Date().toISOString().slice(0,10)}.json`;
     document.body.appendChild(a);
     a.click();
@@ -2413,7 +2413,7 @@ const UIController = {
   },
 
   _createTypingIndicator() {
-    const name = SettingsManager.getAll().agentName || '小暖';
+    const name = SettingsManager.getAll().agentName || '小心';
     const row = document.createElement('div');
     row.className = 'msg-row agent thinking';
     row.id = 'typingIndicator';
@@ -2648,7 +2648,7 @@ const UIController = {
 
     // 助手昵称
     document.getElementById('settingAgentName').addEventListener('change', (e) => {
-      const name = e.target.value.trim() || '小暖';
+      const name = e.target.value.trim() || '小心';
       SettingsManager.set('agentName', name);
       this._updateBranding();
     });
@@ -2656,7 +2656,7 @@ const UIController = {
 
   _loadSettingsToForm() {
     const s = SettingsManager.getAll();
-    document.getElementById('settingAgentName').value = s.agentName || '小暖';
+    document.getElementById('settingAgentName').value = s.agentName || '小心';
     document.getElementById('settingApiKey').value = s.apiKey || '';
     document.getElementById('settingBaseURL').value = s.baseURL || '';
     document.getElementById('settingModel').value = s.model || 'deepseek-v4-flash';
@@ -2666,9 +2666,9 @@ const UIController = {
   },
 
   _updateBranding() {
-    const name = SettingsManager.getAll().agentName || '小暖';
+    const name = SettingsManager.getAll().agentName || '小心';
     document.getElementById('sidebarLogoName').textContent = name;
-    document.title = `${name} — 情感沟通助手`;
+    document.title = name;
   },
 
   _updateApiStatus() {
@@ -2692,7 +2692,7 @@ const UIController = {
   _checkFirstRun() {
     if (!SettingsManager.isValid()) {
       setTimeout(() => {
-        const name = SettingsManager.getAll().agentName || '小暖';
+        const name = SettingsManager.getAll().agentName || '小心';
         this._showToast(`欢迎使用${name}！请先配置 API Key`, 'info');
         this._toggleSettings(true);
       }, 500);
@@ -2711,7 +2711,7 @@ document.addEventListener('DOMContentLoaded', () => {
    Global Error Handler
    ======================================== */
 window.onerror = (msg, url, line, col, error) => {
-  console.error('[小暖] 未捕获错误:', msg, 'at', line, ':', col);
+  console.error('[小心] 未捕获错误:', msg, 'at', line, ':', col);
   const toast = document.createElement('div');
   toast.className = 'toast error';
   toast.textContent = '出了点问题，刷新页面即可恢复';
@@ -2721,7 +2721,7 @@ window.onerror = (msg, url, line, col, error) => {
 };
 
 window.addEventListener('unhandledrejection', (e) => {
-  console.error('[小暖] 未处理的Promise拒绝:', e.reason);
+  console.error('[小心] 未处理的Promise拒绝:', e.reason);
   const toast = document.createElement('div');
   toast.className = 'toast error';
   toast.textContent = '出了点问题，刷新页面即可恢复';
