@@ -344,25 +344,9 @@ input, textarea {
 }
 .msg-row.user .msg-avatar {
   width: 40px; height: 40px;
-  font-size: 20px;
-  background: linear-gradient(135deg, #e8b4c8, #d495ae);
-  position: relative;
-}
-.msg-row.user .msg-avatar::before {
-  content: '';
-  position: absolute;
-  width: 14px; height: 14px;
-  border-radius: 50%;
-  background: #fce4ec;
-  top: 7px; left: 50%; transform: translateX(-50%);
-}
-.msg-row.user .msg-avatar::after {
-  content: '';
-  position: absolute;
-  width: 22px; height: 14px;
-  border-radius: 11px 11px 3px 3px;
-  background: #fce4ec;
-  bottom: 7px; left: 50%; transform: translateX(-50%);
+  font-size: 22px;
+  background: linear-gradient(135deg, #d4b8e8, #b98eff);
+  display: flex; align-items: center; justify-content: center;
 }
 .msg-row.agent .msg-avatar {
   width: 36px; height: 36px;
@@ -665,26 +649,9 @@ input, textarea {
   width: 36px; height: 36px;
   border-radius: 50%;
   flex-shrink: 0;
-  background: linear-gradient(135deg, #e8b4c8, #d495ae);
+  background: linear-gradient(135deg, #d4b8e8, #b98eff);
   display: flex; align-items: center; justify-content: center;
   font-size: 18px;
-  position: relative;
-}
-.profile-card .pf-avatar::before {
-  content: '';
-  position: absolute;
-  width: 11px; height: 11px;
-  border-radius: 50%;
-  background: #fce4ec;
-  top: 6px; left: 50%; transform: translateX(-50%);
-}
-.profile-card .pf-avatar::after {
-  content: '';
-  position: absolute;
-  width: 18px; height: 11px;
-  border-radius: 9px 9px 2px 2px;
-  background: #fce4ec;
-  bottom: 6px; left: 50%; transform: translateX(-50%);
 }
 .profile-card .pf-info { flex: 1; min-width: 0; }
 .profile-card .pf-name {
@@ -2302,7 +2269,7 @@ const UIController = {
     this._dom.profileArea.innerHTML = `
       <div class="profile-card" id="profileCard">
         <div class="pf-row">
-          <div class="pf-avatar"></div>
+          <div class="pf-avatar">💕</div>
           <div class="pf-info">
             <div class="pf-name">${this._escapeHtml(profile.name)}</div>
             <div class="pf-tags">${tags.join('')}</div>
@@ -2412,7 +2379,7 @@ const UIController = {
     const row = document.createElement('div');
     row.className = 'msg-row user';
     row.innerHTML = `
-      <div class="msg-avatar"></div>
+      <div class="msg-avatar">👤</div>
       <div class="msg-content">
         <div class="msg-bubble">${this._escapeHtml(this._stripMarkdown(msg.content))}</div>
         <div class="msg-time">${this._formatTime(msg.timestamp)}</div>
