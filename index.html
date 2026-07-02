@@ -929,7 +929,7 @@ input, textarea {
       <div class="settings-group">
         <label>模型</label>
         <select class="settings-select" id="settingModel">
-          <option value="deepseek-v4-pro[1M]">DeepSeek V4 Pro (1M)</option>
+          <option value="deepseek-v4-pro">DeepSeek V4 Pro (1M)</option>
           <option value="deepseek-v4-flash">DeepSeek V4 Flash</option>
           <option value="deepseek-chat">DeepSeek V3</option>
           <option value="deepseek-reasoner">DeepSeek R1</option>
@@ -978,7 +978,7 @@ const SettingsManager = {
   DEFAULTS: {
     apiKey: '',
     baseURL: 'https://api.deepseek.com',
-    model: 'deepseek-v4-pro[1M]',
+    model: 'deepseek-v4-pro',
     temperature: 0.7,
     agentName: '小心',
   },
@@ -992,8 +992,8 @@ const SettingsManager = {
       const raw = localStorage.getItem('emotion-agent:settings');
       if (raw) {
         this._cache = { ...this.DEFAULTS, ...JSON.parse(raw) };
-        // 迁移旧默认模型
-        if (this._cache.model === 'deepseek-v4-flash') {
+        // 迁移旧模型名
+        if (this._cache.model === 'deepseek-v4-flash' || this._cache.model === 'deepseek-v4-pro[1M]') {
           this._cache.model = this.DEFAULTS.model;
           this._save(this._cache);
         }
@@ -2826,7 +2826,7 @@ const UIController = {
     document.getElementById('settingAgentName').value = s.agentName || '小心';
     document.getElementById('settingApiKey').value = s.apiKey || '';
     document.getElementById('settingBaseURL').value = s.baseURL || '';
-    document.getElementById('settingModel').value = s.model || 'deepseek-v4-pro[1M]';
+    document.getElementById('settingModel').value = s.model || 'deepseek-v4-pro';
     document.getElementById('settingTemperature').value = s.temperature ?? 0.7;
     this._updateApiStatus();
     this._updateBranding();
