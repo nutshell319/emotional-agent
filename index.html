@@ -394,13 +394,9 @@ input, textarea {
   color: var(--title);
 }
 
-/* 分段回复的连续气泡 — 隐藏头像、紧凑间距 */
+/* 分段回复的连续气泡 — 紧凑间距，保留头像 */
 .msg-row.agent.consecutive {
-  margin-top: 4px;
-}
-.msg-row.agent.consecutive .msg-avatar {
-  opacity: 0;
-  pointer-events: none;
+  margin-top: 2px;
 }
 
 .msg-time {
@@ -1853,9 +1849,48 @@ const ChatManager = {
     StorageManager.saveChat(chat);
   },
 
-  /** 发送用户消息，分两段请求：先第一反应，再分析 */
+  /** 按段落自然拆分：空行分隔 → 每个段落一个气泡 */
+  _splitResponse(text) {
+    text = text.trim();
+    if (!text) return [''];
+
+    // 按空行（段落）拆分
+    let segments = text.split(/\n{2,}/).map(s => s.trim()).filter(s => s);
+
+    // 如果只有一段且很长，尝试按单换行拆分
+    if (segments.length === 1 && segments[0].length > 80) {
+      const lines = segments[0].split(/\n/).map(s => s.trim()).filter(s => s);
+      if (lines.length > 1) {
+        // 合并过短的行到前一/后一段
+        const merged = [];
+        for (const line of lines) {
+          if (merged.length > 0 && line.length < 12) {
+            merged[merged.length - 1] += '\n' + line;
+          } else {
+            merged.push(line);
+          }
+        }
+        segments = merged;
+      }
+    }
+
+    // 合并过短的段到相邻段
+    const result = [];
+    for (const seg of segments) {
+      if (result.length > 0 && seg.length < 8) {
+        result[result.length - 1] += '\n' + seg;
+      } else {
+        result.push(seg);
+      }
+    }
+
+    console.log('[Split]', result.length + '段:', result.map(s => s.length + '字').join(', '));
+    return result.length > 0 ? result : [text];
+  },
+
+  /** 发送用户消息并获取流式回复（前端按段落自动拆分气泡） */
   async sendMessage(userInput, uiCallbacks) {
-    const { onUserMsg, onAgentChunk, onAgentDone, onAgentSegmentDone, onError, onReject } = uiCallbacks;
+    const { onUserMsg, onAgentChunk, onAgentDone, onError, onReject } = uiCallbacks;
 
     // 1. 领域预检
     const domainCheck = SafetyGuard.checkDomain(userInput);
@@ -1888,81 +1923,66 @@ const ChatManager = {
     }
     StorageManager.saveChat(chat);
 
-    // === 第一段：第一反应（吐槽/共鸣/判断，一句话） ===
-    const ctx1 = await this.buildContext();
-    ctx1[0] = { ...ctx1[0], content: ctx1[0].content + '\n\n【本次只回复第一反应：吐槽/共鸣/判断，一句话，必须带口头禅。不要展开分析，不要给建议。】' };
+    // 4. 流式请求
+    const context = await this.buildContext();
+    let fullResponse = '';
 
-    let seg1 = '';
-    try {
-      await new Promise((resolve, reject) => {
-        DeepSeekClient.streamChat(ctx1, {
-          onChunk: (text) => { seg1 += text; onAgentChunk(text); },
-          onDone: () => {
-            const c = this.getCurrentChat();
-            if (c) {
-              c.messages.push({ role: 'assistant', content: stripMarkdown(seg1.trim()), timestamp: new Date().toISOString() });
-              StorageManager.saveChat(c);
-            }
-            onAgentSegmentDone(); // 关闭第一个气泡
-            resolve();
-          },
-          onError: reject,
-        });
-      });
-    } catch (err) {
-      onError(err);
-      return;
-    }
-
-    // === 第二段：简短分析或建议 ===
-    const ctx2 = await this.buildContext(); // 重新构建，历史中已包含 seg1
-    ctx2[0] = { ...ctx2[0], content: ctx2[0].content + '\n\n【你刚才给了第一反应。现在继续补充2-3句分析或建议。直接说，不要重复刚才的第一反应。】' };
-
-    let seg2 = '';
-    try {
-      await new Promise((resolve, reject) => {
-        DeepSeekClient.streamChat(ctx2, {
-          onChunk: (text) => { seg2 += text; onAgentChunk(text); },
-          onDone: () => {
-            const c = this.getCurrentChat();
-            if (c) {
-              c.messages.push({ role: 'assistant', content: stripMarkdown(seg2.trim()), timestamp: new Date().toISOString() });
-              StorageManager.saveChat(c);
-            }
-            resolve();
-          },
-          onError: reject,
-        });
-      });
-    } catch (err) {
-      // 第二段失败但第一段已保存 — 标记中断
-      if (seg2) {
-        const c = this.getCurrentChat();
-        if (c) {
-          c.messages.push({ role: 'assistant', content: stripMarkdown(seg2) + '\n\n[响应中断]', timestamp: new Date().toISOString() });
-          StorageManager.saveChat(c);
-        }
-      }
-      onError(err);
-      return;
-    }
-
-    // 记忆提取
-    const finalChat = this.getCurrentChat();
-    const userMsgCount = finalChat.messages.filter(m => m.role === 'user').length;
-    if (userMsgCount >= 5) {
-      const memory = UserMemoryManager.get();
-      const lastExtracted = memory.lastExtractedAt ? new Date(memory.lastExtractedAt) : null;
-      const elapsed = lastExtracted ? (Date.now() - lastExtracted.getTime()) : Infinity;
-      if (elapsed > 10 * 60 * 1000) {
-        setTimeout(() => {
-          UserMemoryManager.extractFacts(finalChat.id).then(() => {
-            UIController._renderUserProfileCard();
+    DeepSeekClient.streamChat(context, {
+      onChunk: (text) => {
+        fullResponse += text;
+        onAgentChunk(text);
+      },
+      onDone: () => {
+        // 按段落拆分为多个气泡
+        const segments = this._splitResponse(fullResponse);
+        const chat = this.getCurrentChat();
+        if (chat) {
+          segments.forEach(seg => {
+            chat.messages.push({
+              role: 'assistant',
+              content: stripMarkdown(seg),
+              timestamp: new Date().toISOString(),
+            });
           });
-        }, 2000);
-      }
-    }
-    onAgentDone();
+          StorageManager.saveChat(chat);
+        }
+        // 记忆提取
+        const userMsgCount = chat.messages.filter(m => m.role === 'user').length;
+        if (userMsgCount >= 5) {
+          const memory = UserMemoryManager.get();
+          const lastExtracted = memory.lastExtractedAt ? new Date(memory.lastExtractedAt) : null;
+          const elapsed = lastExtracted ? (Date.now() - lastExtracted.getTime()) : Infinity;
+          if (elapsed > 10 * 60 * 1000) {
+            setTimeout(() => {
+              UserMemoryManager.extractFacts(chat.id).then(() => {
+                UIController._renderUserProfileCard();
+              });
+            }, 2000);
+          }
+        }
+        onAgentDone();
+      },
+      onError: (err) => {
+        if (fullResponse) {
+          const chat = this.getCurrentChat();
+          if (chat) {
+            const segments = this._splitResponse(fullResponse);
+            if (segments.length > 0) {
+              segments[segments.length - 1] = segments[segments.length - 1] + '\n\n[响应中断]';
+            }
+            segments.forEach(seg => {
+              chat.messages.push({
+                role: 'assistant',
+                content: stripMarkdown(seg),
+                timestamp: new Date().toISOString(),
+              });
+            });
+            StorageManager.saveChat(chat);
+          }
+        }
+        onError(err);
+      },
+    });
   },
 
   /** 重试最后一条消息（补全中断的响应） */
@@ -2553,13 +2573,6 @@ const UIController = {
         }
         this._streamingBubble.textContent += this._stripMarkdown(chunk);
         this._scrollToBottom();
-      },
-      onAgentSegmentDone: () => {
-        // 第一段结束，关闭当前气泡准备第二段
-        if (this._streamingBubble) {
-          this._streamingBubble.classList.remove('streaming');
-        }
-        this._streamingBubble = null;
       },
       onAgentDone: () => {
         if (this._streamingBubble) {
