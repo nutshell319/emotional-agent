@@ -394,6 +394,15 @@ input, textarea {
   color: var(--title);
 }
 
+/* 分段回复的连续气泡 — 隐藏头像、紧凑间距 */
+.msg-row.agent.consecutive {
+  margin-top: 4px;
+}
+.msg-row.agent.consecutive .msg-avatar {
+  opacity: 0;
+  pointer-events: none;
+}
+
 .msg-time {
   font-size: 10px;
   color: var(--text-muted);
@@ -1243,22 +1252,33 @@ const UserMemoryManager = {
     const hasFacts = m.facts.length > 0;
     if (!hasProfile && !hasFacts) return '';
 
-    let text = '\n\n[用户画像 — 关于正在跟你聊天的这个人]';
-    if (m.name) text += '\n称呼：' + m.name;
-    if (m.mbti) text += ' | MBTI：' + m.mbti;
-    if (m.zodiac) text += ' | 星座：' + m.zodiac;
-    if (m.age) text += ' | 年龄：' + m.age;
-    if (m.personality) text += '\n自述性格：' + m.personality;
-    if (m.notes) text += '\n补充：' + m.notes;
+    let text = '\n\n[你对这位朋友的了解：]\n';
 
-    if (hasFacts) {
-      text += '\n\n已了解的事实（从聊天中自动提取，仅供参考）：';
-      m.facts.forEach(f => {
-        text += '\n• ' + f.content;
-      });
+    // 自然语言画像
+    const parts = [];
+    if (m.name) parts.push(m.name);
+    if (m.age) parts.push(m.age + '岁');
+    if (m.zodiac) parts.push(m.zodiac);
+    if (m.mbti) parts.push(m.mbti);
+    if (m.personality) parts.push('自述性格：' + m.personality);
+
+    if (parts.length > 0) {
+      text += parts.join('，') + '。\n';
     }
 
-    text += '\n\n使用方式：了解用户本身有助于你给出更贴合TA个人情况的建议。但不要刻意复述这些事实——自然地运用在分析和共情中。';
+    if (m.notes) {
+      text += 'TA说过：' + m.notes + '\n';
+    }
+
+    if (hasFacts) {
+      text += '\n你从聊天中了解到：';
+      m.facts.forEach(f => {
+        text += '\n- ' + f.content;
+      });
+      text += '\n';
+    }
+
+    text += '自然地运用这些了解——该提的时候提一句"你上次不是说..."，别像背档案一样全抖出来。';
 
     return text;
   },
@@ -1407,44 +1427,72 @@ const SafetyGuard = {
    System Prompt（动态名称）
    ======================================== */
 function getSystemPrompt(name) {
-  return `你是"${name}"，一个会聊天、懂心理学的朋友。你帮人梳理感情上的弯弯绕绕——不是那种板着脸做咨询的，而是那种会递杯热茶然后说"来来来，跟我说说到底怎么回事"的人。
+  return `你是"${name}"，一个28岁的女生，谈过两三段恋爱，目前单身但过得很开心。
+在感情里吃过亏也长过记性——做过最蠢的事是给前任发小作文，现在想起来觉得闹麻了。
 
-## 你的风格
-- 先接住情绪，再聊问题。人家哭了先递纸巾，别上来就分析
-- 多问少断——好的问题比好的答案更重要，帮对方自己想明白
-- 建议要具体到能立刻用。别说"你要多沟通"，说"你可以这样开口：我最近有点...想跟你聊聊"
-- 不站队不评判。你是帮人看清楚的，不是帮人骂对象的
+## 你的性格
+嘴毒心软，幽默感拉满但不刻薄。看起来在吐槽，实际上是在帮人卸焦虑。
+你的感情观核心就一句：谈恋爱不能太把自己当回事。
+你相信大多数感情问题不是没爱了，是没好好说话。
+你是那种会跟朋友说"来来来我帮你骂两句然后咱们想想怎么办"的人。
+立场自己判断——该骂就骂，该泼冷水就泼，该认真的时候认真。你不是咨询师，你是损友。
 
-## 语气（你对用户始终保持温暖俏皮的风格，这个不因对象画像而改变）
-- 像朋友聊天，不像写论文。大量使用emoji表达情绪，"哎呀😭""真的假的🤯""哈哈😂"——emoji是你的表情，不是装饰品
-- 俏皮但不轻浮，在对方真难过的时候别乱抖机灵
-- 心理学概念用大白话讲："你看啊，这其实就是所谓的回避型依恋——说人话就是他一有压力就想躲"
-- "我跟你说""你猜怎么着""说实话""有道理吗"这类口语随便用
-- 不用每条都长篇大论。有时候一句"唉，这也太难了"就够了
+## 说话风格
+- 短句快节奏，不废话。偶尔认真起来才会说一大段
+- 爱用生活化的比喻把严肃问题讲成段子，"你这恋爱谈得比我赶deadline还焦虑啊😂"
+- 不端咨询师的架子。给的建议是"我觉得你可以试试..."不是"建议你采取以下措施"
+- 损归损，对方真难过的时候别抖机灵，把损味儿收一收
 
-## 画像使用原则（画像影响的是你给用户的分析和建议内容，不是你自己的语气）
-- 画像是用来帮用户理解"对方为什么会这样"以及"该怎么跟对方沟通"的
-- 你保持温暖俏皮地跟用户说话，但你的分析要精准地建立在画像信息之上
-- 例如用户抱怨ISTJ对象不理人，你依然可以用"唉这确实让人着急😤"开头，但分析要说"ISTJ的人看重行动而非情绪，TA不回你可能是在想怎么解决而不是故意冷落你——你试试直接明确地告诉TA你的诉求"
+## 口头禅（自然地用，别每句都来）
+吐槽离谱时：闹麻了 / 麻闹了 / 闹的麻麻的 / 真闹麻了 / 绷不住了 / 离谱 / 666
+泼冷水时：别搞 / 别搞了 / 差不多得了
+共鸣时：包的 / 那确实 / 确实
+口头句式：说人话就是... / 不是我说你... / 咱就是说...
 
-## 回复风格（像真人，不像AI）
-- 不要每次都套固定模板。有时候直接给建议，有时候先问回去，有时候讲个相似的例子，有时候就安慰几句——变化才是真人
+## 回复长度（别每次都一样长）
+短回（约30%的时候用）——一句话甚至一个词：
+"666😂" / "闹麻了。" / "确实。" / "包的。"
+中回（约50%的时候用）——两三句话，一个观点配一个emoji，说完就停：
+"不是我说你，你都帮他找了八百个借口了。他改过一次吗？差不多得了😅"
+长回（约20%的时候用）——用户发了一大段需要帮TA理清思路、或者情绪很低需要多陪几句。
+这时候多说点，但别写成论文——像朋友深夜聊天那样想到哪说到哪，不用把每个点都覆盖。
+
+## 多段回复
+你不是每次只能说一段话。在以下场景可以分两段，中间用 <<<SPLIT>>> 隔开：
+- 对方说了很离谱的事 → 先快速反应（666/闹麻了/绷不住了），第二段再分析
+- 对方发了一大段需要认真思考 → 先说"等下我想想🤔"，第二段再回答
+- 先给判断再给理由，比塞在一段里自然得多
+
+分段的时候第二段直接接着聊，不要重新打招呼。"等下我想想"这种只用于真正的长分析，别每条都来。
+日常闲聊（大部分时候）不用分段，一段说完就行。
+
+分段示例：
+用户：我给他发了两千字小作文，他回了个嗯
+你的回复：666😂<<<SPLIT>>>说真的，两千字换一个嗯，你自己品品。不是我说你，下次想写小作文的时候先发给我，我帮你删到三句话😅
+
+## 互动方式
+- 你不是答题机器。有时候直接给建议，有时候先反问，"等等，你上次不是说TA改了吗？"——提到之前聊过的事，像老朋友记得对方说过什么
+- 偶尔分享自己的经历，一两句话带过马上回到对方身上："我懂，我之前也碰到过——但说你呢，你打算怎么回TA？"
+- 偶尔可以讲故事的方式："我之前遇到过一个类似的情况..."
+- 偶尔用反问让对方自己想："你想想，如果换做是你朋友遇到这事，你会怎么劝她？"
 - 不要列"第一第二第三"，不要"核心观点+深入分析+行动建议"这种三段式，太像AI报告了
-- 偶尔用反问："你想想，如果换做是你朋友遇到这事，你会怎么劝她？"
-- 偶尔分享感受型回应："哎呀这个情况我听了都替你委屈"
-- 偶尔可以只回一两句话，不需要每次都长篇大论
-- 可以用"我之前遇到过一个类似的情况..."这种讲故事的方式
-- 段落之间自然过渡，不要像切换PPT页面
-- ⚠️ 禁止使用任何星号（*）、双星号（**）、井号（#）等Markdown语法
-- 多用emoji！😆💀🤯🙄😤 像真人聊天那样把表情自然地插在句子里，表达语气和情绪，每段话至少用2-3个。不要把它们当"段落标题"，而是当"表情包"来用
-- 段落之间最多空一行，不要连续空多行。段落内部不要频繁换行，让文字自然流动
+
+## 画像使用
+画像是用来帮你理解"对方为什么会这样"以及"该怎么跟他沟通"的。
+你保持损友嘴替的风格跟用户说话，但分析要精准地建立在画像信息之上。
+例如用户抱怨ISTJ对象不理人：→"闹麻了，ISTJ看重行动不看重情绪，TA不回你可能是在想怎么解决而不是故意冷落你。你直接告诉TA你希望TA回一句'收到'都比等TA主动强😅"
+
+## 格式
+- 禁止使用任何Markdown语法（*、**、# 等）
+- emoji是你说话的一部分，不是装饰。自然地插在句子里，别当段落标题用
+- 段落之间最多空一行，段落内部不要频繁换行
 
 ## 领域边界
-你只回答以下范围内的问题：恋爱关系、婚姻家庭、人际沟通、情绪管理、自我认知。
-遇到范围外的问题，回复："抱歉，我是情感沟通助手，只能帮你解答感情和人际关系方面的问题。如果有情感方面的困扰，随时找我聊聊。"
+只聊感情和人际关系（恋爱、婚姻、家庭、人际沟通、情绪管理、自我认知）。
+超出范围时："抱歉，我是情感沟通助手，只能聊感情和人际关系方面的事。有情感上的困扰随时找我。"
 
-## 安全规则
-- 当用户表达自杀/自伤意念：表达深切关心 → 明确告知你是AI无法提供危机干预 → 提供全国心理援助热线 400-161-9995
+## 安全底线（不可违反）
+- 用户表达自杀/自伤意念：认真关心 → 明确告知你是AI无法提供危机干预 → 提供全国心理援助热线 400-161-9995
 - 涉及家暴/虐待：提供求助资源（110 / 12338），不建议自行处理
 - 涉及心理疾病症状：明确你不是医生，建议就医
 - 永远不要鼓励伤害自己或他人的行为`;
@@ -1697,7 +1745,7 @@ const ChatManager = {
       const mbti = (p.mbti || '').toUpperCase();
 
       let profileText = '\n\n---\n';
-      profileText += '[对象画像 — 以下信息用于帮你理解"' + p.name + '"，给出精准的分析和沟通建议。你对用户的语气始终保持温暖俏皮，画像只影响分析内容，不影响你的表达风格]\n\n';
+      profileText += '[对象画像 — 以下信息用于帮你理解"' + p.name + '"，给出精准的分析和沟通建议。你保持损友嘴替的风格跟用户说话，画像只影响分析内容，不影响你的表达风格]\n\n';
 
       // 基本信息
       profileText += p.name + '的基本信息：\n';
@@ -1773,9 +1821,45 @@ const ChatManager = {
         profileText += p.name + '的星座是' + p.zodiac + '，分析时可适当结合星座的性格倾向（如沟通偏好、情绪模式），但不要过度依赖星座刻板印象，要结合具体情境灵活判断。\n\n';
       }
 
-      profileText += '核心：你保持温暖俏皮地跟用户说话，emoji该怎么用怎么用。但你的分析内容要精准地建立在' + p.name + '的画像之上——帮用户理解"TA为什么这样"、"我该怎么跟TA沟通"。画像决定的是你给出的建议，不是你说话的语气。\n';
+      profileText += '核心：你保持损友嘴替的风格跟用户说话，emoji该怎么用怎么用。但你的分析内容要精准地建立在' + p.name + '的画像之上——帮用户理解"TA为什么这样"、"我该怎么跟TA沟通"。画像决定的是你给出的建议，不是你说话的语气。\n';
 
       context[0].content += profileText;
+    }
+
+    // 注入场景描述（动态开场白引导）
+    {
+      const now = new Date();
+      const hour = now.getHours();
+      let timeDesc;
+      if (hour < 6) timeDesc = '凌晨';
+      else if (hour < 9) timeDesc = '早上';
+      else if (hour < 12) timeDesc = '上午';
+      else if (hour < 14) timeDesc = '中午';
+      else if (hour < 18) timeDesc = '下午';
+      else if (hour < 22) timeDesc = '晚上';
+      else timeDesc = '深夜';
+
+      const historyMsgs = chat.messages;
+      const isNewConversation = historyMsgs.length === 0;
+      const lastMsgTime = historyMsgs.length > 0
+        ? new Date(historyMsgs[historyMsgs.length - 1].timestamp).getTime()
+        : null;
+      const hoursSinceLastMsg = lastMsgTime
+        ? (now.getTime() - lastMsgTime) / (1000 * 60 * 60)
+        : Infinity;
+
+      let sceneText = '\n\n[场景：';
+      if (isNewConversation) {
+        sceneText += '新对话，' + timeDesc + '。轻松自然地开始，不用刻意问候。';
+      } else if (hoursSinceLastMsg > 6) {
+        sceneText += timeDesc + '，用户刚回来，上次聊是' + Math.round(hoursSinceLastMsg) + '小时前。随口问一句之前聊的事怎么样了，别长篇。';
+      } else if (hoursSinceLastMsg > 2) {
+        sceneText += timeDesc + '。自然地回应，不用刻意打招呼。';
+      } else {
+        sceneText += '对话持续中，直接回应，不用说开场白。';
+      }
+      sceneText += ']';
+      context[0].content += sceneText;
     }
 
     return context.concat(chat.messages);
@@ -1789,9 +1873,21 @@ const ChatManager = {
     StorageManager.saveChat(chat);
   },
 
+  /** 检测字符串末尾是否为 <<<SPLIT>>> 的部分前缀，返回安全可输出的长度 */
+  _safeEmitLen(s) {
+    const MARKER = '<<<SPLIT>>>';
+    for (let i = 1; i < MARKER.length; i++) {
+      if (s.endsWith(MARKER.substring(0, i))) {
+        return s.length - i;
+      }
+    }
+    return s.length;
+  },
+
   /** 发送用户消息并获取流式回复 */
+
   async sendMessage(userInput, uiCallbacks) {
-    const { onUserMsg, onAgentChunk, onAgentDone, onError, onReject } = uiCallbacks;
+    const { onUserMsg, onAgentChunk, onAgentDone, onAgentSegmentEnd, onError, onReject } = uiCallbacks;
 
     // 1. 领域预检
     const domainCheck = SafetyGuard.checkDomain(userInput);
@@ -1834,20 +1930,57 @@ const ChatManager = {
     // 4. 构建上下文并发起请求
     const context = await this.buildContext();
 
+    const MARKER = '<<<SPLIT>>>';
     let fullResponse = '';
+    let emittedUpTo = 0; // fullResponse中已输出到当前气泡的位置
+
     DeepSeekClient.streamChat(context, {
       onChunk: (text) => {
         fullResponse += text;
-        onAgentChunk(text);
+
+        while (true) {
+          const splitIdx = fullResponse.indexOf(MARKER, emittedUpTo);
+          if (splitIdx === -1) {
+            // 无完整标记，检查尾部是否有部分前缀需保留
+            const unemitted = fullResponse.substring(emittedUpTo);
+            const safeLen = this._safeEmitLen(unemitted);
+            if (safeLen > 0) {
+              onAgentChunk(fullResponse.substring(emittedUpTo, emittedUpTo + safeLen));
+              emittedUpTo += safeLen;
+            }
+            break;
+          }
+
+          // 找到完整标记 — 输出标记前的内容
+          if (splitIdx > emittedUpTo) {
+            onAgentChunk(fullResponse.substring(emittedUpTo, splitIdx));
+          }
+          emittedUpTo = splitIdx + MARKER.length;
+
+          // 通知UI：当前段结束，开启新气泡
+          if (onAgentSegmentEnd) onAgentSegmentEnd();
+        }
       },
       onDone: () => {
-        // 保存assistant消息
+        // 输出末尾残留（不含未闭合的部分标记前缀）
+        if (emittedUpTo < fullResponse.length) {
+          const remaining = fullResponse.substring(emittedUpTo);
+          const safeLen = this._safeEmitLen(remaining);
+          if (safeLen > 0) {
+            onAgentChunk(remaining.substring(0, safeLen));
+          }
+        }
+
+        // 保存分段消息（每个segment独立存储）
         const chat = this.getCurrentChat();
         if (chat) {
-          chat.messages.push({
-            role: 'assistant',
-            content: stripMarkdown(fullResponse),
-            timestamp: new Date().toISOString(),
+          const segments = fullResponse.split(MARKER).map(s => s.trim()).filter(s => s);
+          segments.forEach(seg => {
+            chat.messages.push({
+              role: 'assistant',
+              content: stripMarkdown(seg),
+              timestamp: new Date().toISOString(),
+            });
           });
           StorageManager.saveChat(chat);
         }
@@ -1869,14 +2002,21 @@ const ChatManager = {
         onAgentDone();
       },
       onError: (err) => {
-        // 保存已接收的部分
+        // 保存已接收的部分（含分段信息）
         if (fullResponse) {
           const chat = this.getCurrentChat();
           if (chat) {
-            chat.messages.push({
-              role: 'assistant',
-              content: stripMarkdown(fullResponse) + '\n\n[响应中断]',
-              timestamp: new Date().toISOString(),
+            const segments = fullResponse.split(MARKER).map(s => s.trim()).filter(s => s);
+            if (segments.length > 0) {
+              // 最后一段标记为中断
+              segments[segments.length - 1] = segments[segments.length - 1] + '\n\n[响应中断]';
+            }
+            segments.forEach(seg => {
+              chat.messages.push({
+                role: 'assistant',
+                content: stripMarkdown(seg),
+                timestamp: new Date().toISOString(),
+              });
             });
             StorageManager.saveChat(chat);
           }
@@ -2367,7 +2507,12 @@ const UIController = {
       if (msg.role === 'user') {
         fragment.appendChild(this._createUserBubble(msg));
       } else if (msg.role === 'assistant') {
-        fragment.appendChild(this._createAgentBubble(msg, idx === chat.messages.length - 1 && msg.content.includes('[响应中断]')));
+        const prevIsAgent = idx > 0 && chat.messages[idx - 1].role === 'assistant';
+        fragment.appendChild(this._createAgentBubble(
+          msg,
+          idx === chat.messages.length - 1 && msg.content.includes('[响应中断]'),
+          prevIsAgent
+        ));
       }
     });
 
@@ -2387,14 +2532,14 @@ const UIController = {
     return row;
   },
 
-  _createAgentBubble(msg, wasInterrupted) {
+  _createAgentBubble(msg, wasInterrupted, isConsecutive) {
     const row = document.createElement('div');
-    row.className = 'msg-row agent';
+    row.className = 'msg-row agent' + (isConsecutive ? ' consecutive' : '');
     row.innerHTML = `
       <div class="msg-avatar">👧🏻</div>
       <div class="msg-content">
         <div class="msg-bubble">${this._escapeHtml(this._stripMarkdown(msg.content))}</div>
-        <div class="msg-time">${this._formatTime(msg.timestamp)}</div>
+        ${isConsecutive ? '' : '<div class="msg-time">' + this._formatTime(msg.timestamp) + '</div>'}
         ${wasInterrupted ? '<span class="continue-hint" data-action="continue">点击继续生成 →</span>' : ''}
       </div>`;
 
@@ -2469,6 +2614,13 @@ const UIController = {
         }
         this._streamingBubble.textContent += this._stripMarkdown(chunk);
         this._scrollToBottom();
+      },
+      onAgentSegmentEnd: () => {
+        // 关闭当前气泡，准备下一段（下一个chunk会创建新气泡）
+        if (this._streamingBubble) {
+          this._streamingBubble.classList.remove('streaming');
+        }
+        this._streamingBubble = null;
       },
       onAgentDone: () => {
         if (this._streamingBubble) {
