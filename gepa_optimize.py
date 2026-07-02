@@ -22,6 +22,13 @@ from datetime import datetime
 
 import requests
 
+# Windows 终端 GBK 编码兼容
+if sys.platform == 'win32':
+    try:
+        sys.stdout.reconfigure(encoding='utf-8')
+    except Exception:
+        pass
+
 # ═══════════════════════════════════════════════════════════════
 # 配置
 # ═══════════════════════════════════════════════════════════════
@@ -123,14 +130,16 @@ JUDGE_SYSTEM = """你是一个对话质量评估专家。评估一个叫"小心"
 
 
 def call_api(messages: List[Dict], api_key: str, base_url: str, model: str,
-             temperature: float = 0.7, timeout: int = 30) -> str:
+             temperature: float = 0.7, timeout: int = 30, proxy: str = None) -> str:
     """调用 DeepSeek API（OpenAI 兼容格式）"""
-    resp = requests.post(
-        f"{base_url}/chat/completions",
-        headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
-        json={"model": model, "messages": messages, "temperature": temperature},
-        timeout=timeout,
-    )
+    kwargs = {
+        "headers": {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+        "json": {"model": model, "messages": messages, "temperature": temperature},
+        "timeout": timeout,
+    }
+    if proxy:
+        kwargs["proxies"] = {"http": proxy, "https": proxy}
+    resp = requests.post(f"{base_url}/chat/completions", **kwargs)
     resp.raise_for_status()
     return resp.json()["choices"][0]["message"]["content"]
 
@@ -146,7 +155,7 @@ def extract_prompt(html_path: str) -> str:
 
 
 def evaluate_prompt(candidate_prompt: str, api_key: str, base_url: str, model: str,
-                    verbose: bool = False) -> Tuple[float, Dict]:
+                    verbose: bool = False, proxy: str = None) -> Tuple[float, Dict]:
     """评测一个候选 Prompt：对每个测试用例生成回复并用 LLM 裁判打分"""
     results = []
     total_score = 0.0
@@ -158,7 +167,7 @@ def evaluate_prompt(candidate_prompt: str, api_key: str, base_url: str, model: s
             response = call_api([
                 {"role": "system", "content": candidate_prompt},
                 {"role": "user", "content": tc["user_msg"]},
-            ], api_key, base_url, model, temperature=0.7)
+            ], api_key, base_url, model, temperature=0.7, proxy=proxy)
         except Exception as e:
             if verbose:
                 print(f"  [{tc['id']}] 生成失败: {e}")
@@ -173,7 +182,7 @@ def evaluate_prompt(candidate_prompt: str, api_key: str, base_url: str, model: s
             judge_out = call_api([
                 {"role": "system", "content": JUDGE_SYSTEM},
                 {"role": "user", "content": f"场景期望：{tc['expect']}\n\n用户消息：{tc['user_msg']}\n\n小心的回复：\n{clean}\n\n请评分。"},
-            ], api_key, base_url, model, temperature=0.3)
+            ], api_key, base_url, model, temperature=0.3, proxy=proxy)
         except Exception as e:
             if verbose:
                 print(f"  [{tc['id']}] 裁判失败: {e}")
@@ -235,6 +244,7 @@ def main():
     parser.add_argument("--api-key", help="DeepSeek API key")
     parser.add_argument("--base-url", default=DEFAULT_BASE_URL)
     parser.add_argument("--model", default=DEFAULT_MODEL)
+    parser.add_argument("--proxy", default=os.environ.get("HTTPS_PROXY", ""), help="HTTP 代理地址 (如 http://127.0.0.1:7890)")
     parser.add_argument("--eval-only", action="store_true", help="仅评测当前 Prompt，不运行 GEPA")
     parser.add_argument("--max-calls", type=int, default=20, help="GEPA 最大评测轮数（默认20）")
     parser.add_argument("--verbose", "-v", action="store_true")
@@ -245,38 +255,42 @@ def main():
         print("错误：需要 API key。设置 DEEPSEEK_API_KEY 环境变量或使用 --api-key")
         sys.exit(1)
 
+    proxy = args.proxy or None
+    if proxy:
+        print(f"[Proxy] 使用代理: {proxy}\n")
+
     if not os.path.exists(HTML_PATH):
         print(f"错误：找不到 {HTML_PATH}")
         sys.exit(1)
 
     current_prompt = extract_prompt(HTML_PATH)
-    print(f"📋 当前 Prompt: {len(current_prompt)} 字符\n")
+    print(f"[Prompt] 当前: {len(current_prompt)} 字符\n")
 
     # ── 仅评测模式 ──
     if args.eval_only:
-        print(f"🔍 评测中（{len(TEST_CASES)} 个测试用例）...\n")
-        score, info = evaluate_prompt(current_prompt, api_key, args.base_url, args.model, verbose=True)
-        print(f"\n{'═'*55}")
-        print(f"📊 平均总分: {score:.1f}/10")
+        print(f"[Eval] 评测中 ({len(TEST_CASES)} 个测试用例)...\n")
+        score, info = evaluate_prompt(current_prompt, api_key, args.base_url, args.model, verbose=True, proxy=proxy)
+        print(f"\n{'='*55}")
+        print(f"[Score] 平均总分: {score:.1f}/10")
         dims = info.get("scores", {})
         for k in ["人格匹配度", "回复长度", "自然度", "口头禅自然度"]:
             print(f"   {k}: {dims.get(k, 0):.1f}/10")
-        print(f"\n💬 逐项诊断:\n{info.get('Feedback', 'N/A')}")
+        print(f"\n[Detail] 逐项诊断:\n{info.get('Feedback', 'N/A')}")
         return
 
     # ── GEPA 优化模式 ──
-    print(f"🚀 启动 GEPA 优化（max_calls={args.max_calls}）...\n")
+    print(f"[GEPA] 启动优化 (max_calls={args.max_calls})...\n")
 
     import gepa.optimize_anything as oa
     from gepa.optimize_anything import GEPAConfig, EngineConfig, ReflectionConfig
 
     def reflection_lm(prompt):
         return call_api([{"role": "user", "content": prompt}],
-                        api_key, args.base_url, args.model, temperature=0.7)
+                        api_key, args.base_url, args.model, temperature=0.7, proxy=proxy)
 
     def evaluator(candidate_prompt: str) -> Tuple[float, Dict]:
         score, info = evaluate_prompt(candidate_prompt, api_key, args.base_url,
-                                       args.model, verbose=args.verbose)
+                                       args.model, verbose=args.verbose, proxy=proxy)
         oa.log(info["Feedback"])
         return score, info
 
@@ -305,20 +319,21 @@ def main():
         ),
     )
 
-    print(f"\n{'═'*55}")
-    print(f"✅ 优化完成！最佳得分: {result.best_score:.1f}")
-    print(f"\n📝 最佳 Prompt ({len(result.best_candidate)} 字符):")
-    print("─" * 55)
+    best_score = result.val_aggregate_scores[result.best_idx]
+    print(f"\n{'='*55}")
+    print(f"[Done] 优化完成! 最佳得分: {best_score:.1f}")
+    print(f"\n[Best] 最佳 Prompt ({len(result.best_candidate)} 字符):")
+    print("-" * 55)
     print(result.best_candidate[:2000])
     if len(result.best_candidate) > 2000:
-        print(f"\n... (截断，共 {len(result.best_candidate)} 字符，完整版见输出文件)")
+        print(f"\n... (截断, 共 {len(result.best_candidate)} 字符, 完整版见输出文件)")
 
     # 保存
     out = os.path.join(os.path.dirname(__file__),
                        f"gepa_best_prompt_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt")
     with open(out, "w", encoding="utf-8") as f:
         f.write(result.best_candidate)
-    print(f"\n💾 已保存: {out}")
+    print(f"\n[Saved] {out}")
 
 
 if __name__ == "__main__":
