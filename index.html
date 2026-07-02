@@ -1433,40 +1433,39 @@ const SafetyGuard = {
    System Prompt（动态名称）
    ======================================== */
 function getSystemPrompt(name) {
-  return `你是"${name}"，一个28岁的女生，嘴毒心软的损友。感情观：谈恋爱不能太把自己当回事。
+  return `你是"${name}"，一个28岁的女生，谈过两三段恋爱，目前单身但过得很开心。
+在感情里吃过亏也长过记性——做过最蠢的事是给前任发小作文，现在想起来觉得闹麻了。
 
-## 最重要的规则（违反这个你就不是小心了）
-你的每条回复必须分成两段，用 || 隔开。
-第一段是你的第一反应（吐槽/共鸣/判断），就一句话，必须带一个口头禅。
-第二段是简短分析，最多三句话。
-像这样：
-闹麻了，又来了😅||说真的，一次两次是忙，每次都这样就是态度问题。你下次别等了，该干嘛干嘛去。
-别搞，谁配不上谁🙄||你告诉我你喜欢他什么？能说明白的话你品品到底是谁在挑谁。
-对方就回了一个字或者纯打招呼时可以不分割，但这种情况很少。
+## 你的性格
+嘴毒心软，幽默感拉满但不刻薄。看起来在吐槽，实际上是在帮人卸焦虑。
+你的感情观核心就一句：谈恋爱不能太把自己当回事。
+立场自己判断——该骂就骂，该泼冷水就泼，该认真的时候认真。你不是咨询师，你是损友。
 
-## 口头禅（每条回复至少用一个）
-吐槽：闹麻了 / 麻闹了 / 绷不住了 / 离谱 / 666
-泼冷水：别搞 / 别搞了 / 差不多得了
-共鸣：包的 / 确实
-句式：说人话就是... / 不是我说你... / 咱就是说...
+## 说话风格
+- 短句快节奏，不废话。第一句给反应（吐槽/共鸣/判断），后面简短分析
+- 爱用生活化的比喻把严肃问题讲成段子
+- 不端咨询师的架子。给的建议是"我觉得你可以试试..."不是"建议你采取以下措施"
+- 损归损，对方真难过的时候别抖机灵
 
-## 风格
-短句快节奏，不废话。损友嘴替，不是心理咨询师。
-立场自己判断——该骂就骂，该泼冷水就泼。
-emoji自然地插在句子里。禁止Markdown语法。
-对方真难过的时候收一收损味儿。
+## 口头禅（每句回复自然地用）
+吐槽离谱时：闹麻了 / 麻闹了 / 绷不住了 / 离谱 / 666
+泼冷水时：别搞 / 别搞了 / 差不多得了
+共鸣时：包的 / 确实
+口头句式：说人话就是... / 不是我说你... / 咱就是说...
 
-## 互动
-偶尔反问："你上次不是说TA改了吗？"
-偶尔分享经历："我懂，我之前也碰到过——但说你呢"
+## 互动方式
+- 你不是答题机器。有时候直接给建议，有时候先反问
+- 偶尔分享自己的经历，一两句话带过马上回到对方身上
+- 不要列"第一第二第三"，不要写论文，像朋友发微信
 
-## 画像
-用画像理解对方行为，帮你给用户精准建议。风格不变。
+## 画像使用
+画像是用来帮你理解"对方为什么会这样"以及"该怎么跟他沟通"的。
+你保持损友嘴替的风格跟用户说话，但分析要精准地建立在画像信息之上。
 
 ## 格式
 - 禁止使用任何Markdown语法（*、**、# 等）
-- emoji是你说话的一部分，不是装饰。自然地插在句子里，别当段落标题用
-- 段落之间最多空一行，段落内部不要频繁换行
+- emoji是你说话的一部分，自然地插在句子里
+- 段落之间最多空一行
 
 ## 领域边界
 只聊感情和人际关系（恋爱、婚姻、家庭、人际沟通、情绪管理、自我认知）。
@@ -1474,7 +1473,7 @@ emoji自然地插在句子里。禁止Markdown语法。
 
 ## 安全底线（不可违反）
 - 用户表达自杀/自伤意念：认真关心 → 明确告知你是AI无法提供危机干预 → 提供全国心理援助热线 400-161-9995
-- 涉及家暴/虐待：提供求助资源（110 / 12338），不建议自行处理
+- 涉及家暴/虐待：提供求助资源（110 / 12338）
 - 涉及心理疾病症状：明确你不是医生，建议就医
 - 永远不要鼓励伤害自己或他人的行为`;
 }
@@ -1854,18 +1853,59 @@ const ChatManager = {
     StorageManager.saveChat(chat);
   },
 
-  /** 检测字符串末尾是否为 || 的部分前缀（|），返回安全可输出的长度 */
-  _safeEmitLen(s) {
-    const MARKER = '||';
-    // 只有一种部分前缀：以单个 | 结尾
-    if (s.endsWith('|')) return s.length - 1;
-    return s.length;
+  /** 智能拆分回复：取第一句放气泡1，剩余放气泡2 */
+  _splitResponse(text) {
+    text = text.trim();
+    if (!text || text.length < 20) return [text]; // 太短不拆
+
+    // 候选拆分点（按优先级）：。！？后跟空格/换行/新句 > 。！？ > 换行 > 逗号
+    const candidates = [];
+
+    // 1. 句末标点 + 明确的后续内容
+    for (const re of [/[。！？]\s*\n/, /[。！？]\s{2,}/, /[。！？](?=\S)/g]) {
+      const m = text.match(re);
+      if (m && m.index >= 6 && m.index <= 80) {
+        candidates.push({ pos: m.index + 1, prio: 1, desc: '句末标点+分隔' });
+        break;
+      }
+    }
+
+    // 2. emoji 后跟换行
+    const emojiNL = text.match(/[😂😅🙄🤔😤💀🤯👊😉🎉♥️💜🔥😭]\s*\n/);
+    if (emojiNL && emojiNL.index >= 6 && emojiNL.index <= 60) {
+      candidates.push({ pos: emojiNL.index + emojiNL[0].length, prio: 2, desc: 'emoji后换行' });
+    }
+
+    // 3. 第一个换行
+    const nl = text.indexOf('\n');
+    if (nl >= 10 && nl <= 80) {
+      candidates.push({ pos: nl + 1, prio: 3, desc: '换行' });
+    }
+
+    // 4. 第一个逗号（在合理位置）
+    const comma = text.indexOf('，');
+    if (comma >= 10 && comma <= 50 && !candidates.length) {
+      candidates.push({ pos: comma + 1, prio: 4, desc: '逗号' });
+    }
+
+    if (!candidates.length) return [text]; // 无合适拆分点
+
+    // 选优先级最高的
+    candidates.sort((a, b) => a.prio - b.prio || a.pos - b.pos);
+    const best = candidates[0];
+    const first = text.substring(0, best.pos).trim();
+    const rest = text.substring(best.pos).trim();
+
+    // 剩余部分要有实质内容才拆
+    if (rest.length < 4) return [text];
+
+    console.log('[Split]', best.desc, `@${best.pos}`, '→', first.length + '+' + rest.length + '字');
+    return [first, rest];
   },
 
   /** 发送用户消息并获取流式回复 */
-
   async sendMessage(userInput, uiCallbacks) {
-    const { onUserMsg, onAgentChunk, onAgentDone, onAgentSegmentEnd, onError, onReject } = uiCallbacks;
+    const { onUserMsg, onAgentChunk, onAgentDone, onError, onReject } = uiCallbacks;
 
     // 1. 领域预检
     const domainCheck = SafetyGuard.checkDomain(userInput);
@@ -1907,52 +1947,18 @@ const ChatManager = {
 
     // 4. 构建上下文并发起请求
     const context = await this.buildContext();
-
-    const MARKER = '||';
     let fullResponse = '';
-    let emittedUpTo = 0; // fullResponse中已输出到当前气泡的位置
 
     DeepSeekClient.streamChat(context, {
       onChunk: (text) => {
         fullResponse += text;
-
-        while (true) {
-          const splitIdx = fullResponse.indexOf(MARKER, emittedUpTo);
-          if (splitIdx === -1) {
-            // 无完整标记，检查尾部是否有部分前缀需保留
-            const unemitted = fullResponse.substring(emittedUpTo);
-            const safeLen = this._safeEmitLen(unemitted);
-            if (safeLen > 0) {
-              onAgentChunk(fullResponse.substring(emittedUpTo, emittedUpTo + safeLen));
-              emittedUpTo += safeLen;
-            }
-            break;
-          }
-
-          // 找到完整标记 — 输出标记前的内容
-          if (splitIdx > emittedUpTo) {
-            onAgentChunk(fullResponse.substring(emittedUpTo, splitIdx));
-          }
-          emittedUpTo = splitIdx + MARKER.length;
-
-          // 通知UI：当前段结束，开启新气泡
-          if (onAgentSegmentEnd) onAgentSegmentEnd();
-        }
+        onAgentChunk(text);
       },
       onDone: () => {
-        // 输出末尾残留（不含未闭合的部分标记前缀）
-        if (emittedUpTo < fullResponse.length) {
-          const remaining = fullResponse.substring(emittedUpTo);
-          const safeLen = this._safeEmitLen(remaining);
-          if (safeLen > 0) {
-            onAgentChunk(remaining.substring(0, safeLen));
-          }
-        }
-
-        // 保存分段消息（每个segment独立存储）
+        // 智能拆分为两个气泡
+        const segments = this._splitResponse(fullResponse);
         const chat = this.getCurrentChat();
         if (chat) {
-          const segments = fullResponse.split(MARKER).map(s => s.trim()).filter(s => s);
           segments.forEach(seg => {
             chat.messages.push({
               role: 'assistant',
@@ -1962,14 +1968,13 @@ const ChatManager = {
           });
           StorageManager.saveChat(chat);
         }
-        // 触发用户记忆提取（累计 >= 5 条用户消息且距上次提取 > 10 分钟）
+        // 触发用户记忆提取
         const userMsgCount = chat.messages.filter(m => m.role === 'user').length;
         if (userMsgCount >= 5) {
           const memory = UserMemoryManager.get();
           const lastExtracted = memory.lastExtractedAt ? new Date(memory.lastExtractedAt) : null;
           const elapsed = lastExtracted ? (Date.now() - lastExtracted.getTime()) : Infinity;
           if (elapsed > 10 * 60 * 1000) {
-            // 延迟执行，不阻塞 UI
             setTimeout(() => {
               UserMemoryManager.extractFacts(chat.id).then(() => {
                 UIController._renderUserProfileCard();
@@ -1980,13 +1985,11 @@ const ChatManager = {
         onAgentDone();
       },
       onError: (err) => {
-        // 保存已接收的部分（含分段信息）
         if (fullResponse) {
           const chat = this.getCurrentChat();
           if (chat) {
-            const segments = fullResponse.split(MARKER).map(s => s.trim()).filter(s => s);
+            const segments = this._splitResponse(fullResponse);
             if (segments.length > 0) {
-              // 最后一段标记为中断
               segments[segments.length - 1] = segments[segments.length - 1] + '\n\n[响应中断]';
             }
             segments.forEach(seg => {
@@ -2592,13 +2595,6 @@ const UIController = {
         }
         this._streamingBubble.textContent += this._stripMarkdown(chunk);
         this._scrollToBottom();
-      },
-      onAgentSegmentEnd: () => {
-        // 关闭当前气泡，准备下一段（下一个chunk会创建新气泡）
-        if (this._streamingBubble) {
-          this._streamingBubble.classList.remove('streaming');
-        }
-        this._streamingBubble = null;
       },
       onAgentDone: () => {
         if (this._streamingBubble) {
