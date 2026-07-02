@@ -1853,64 +1853,13 @@ const ChatManager = {
     StorageManager.saveChat(chat);
   },
 
-  /** 智能拆分回复：取第一句放气泡1，剩余放气泡2 */
-  _splitResponse(text) {
-    text = text.trim();
-    if (!text || text.length < 20) return [text]; // 太短不拆
-
-    // 候选拆分点（按优先级）：。！？后跟空格/换行/新句 > 。！？ > 换行 > 逗号
-    const candidates = [];
-
-    // 1. 句末标点 + 明确的后续内容
-    for (const re of [/[。！？]\s*\n/, /[。！？]\s{2,}/, /[。！？](?=\S)/g]) {
-      const m = text.match(re);
-      if (m && m.index >= 6 && m.index <= 80) {
-        candidates.push({ pos: m.index + 1, prio: 1, desc: '句末标点+分隔' });
-        break;
-      }
-    }
-
-    // 2. emoji 后跟换行
-    const emojiNL = text.match(/[😂😅🙄🤔😤💀🤯👊😉🎉♥️💜🔥😭]\s*\n/);
-    if (emojiNL && emojiNL.index >= 6 && emojiNL.index <= 60) {
-      candidates.push({ pos: emojiNL.index + emojiNL[0].length, prio: 2, desc: 'emoji后换行' });
-    }
-
-    // 3. 第一个换行
-    const nl = text.indexOf('\n');
-    if (nl >= 10 && nl <= 80) {
-      candidates.push({ pos: nl + 1, prio: 3, desc: '换行' });
-    }
-
-    // 4. 第一个逗号（在合理位置）
-    const comma = text.indexOf('，');
-    if (comma >= 10 && comma <= 50 && !candidates.length) {
-      candidates.push({ pos: comma + 1, prio: 4, desc: '逗号' });
-    }
-
-    if (!candidates.length) return [text]; // 无合适拆分点
-
-    // 选优先级最高的
-    candidates.sort((a, b) => a.prio - b.prio || a.pos - b.pos);
-    const best = candidates[0];
-    const first = text.substring(0, best.pos).trim();
-    const rest = text.substring(best.pos).trim();
-
-    // 剩余部分要有实质内容才拆
-    if (rest.length < 4) return [text];
-
-    console.log('[Split]', best.desc, `@${best.pos}`, '→', first.length + '+' + rest.length + '字');
-    return [first, rest];
-  },
-
-  /** 发送用户消息并获取流式回复 */
+  /** 发送用户消息，分两段请求：先第一反应，再分析 */
   async sendMessage(userInput, uiCallbacks) {
-    const { onUserMsg, onAgentChunk, onAgentDone, onError, onReject } = uiCallbacks;
+    const { onUserMsg, onAgentChunk, onAgentDone, onAgentSegmentDone, onError, onReject } = uiCallbacks;
 
     // 1. 领域预检
     const domainCheck = SafetyGuard.checkDomain(userInput);
     if (!domainCheck.allowed) {
-      // 本地拒绝，渲染拒绝卡片（不计入消息历史）
       onReject(domainCheck.reason);
       return;
     }
@@ -1918,7 +1867,6 @@ const ChatManager = {
     // 2. 危机检测
     const crisisResponse = SafetyGuard.checkCrisis(userInput);
     if (crisisResponse) {
-      // 触发安全模式 — 同时添加用户消息和安全回复
       const chat = this._ensureChat();
       chat.messages.push(
         { role: 'user', content: userInput, timestamp: new Date().toISOString() },
@@ -1930,81 +1878,91 @@ const ChatManager = {
       return;
     }
 
-    // 3. 正常流程
+    // 3. 保存用户消息
     const chat = this._ensureChat();
-
-    // 添加用户消息
     const userMsg = { role: 'user', content: userInput, timestamp: new Date().toISOString() };
     chat.messages.push(userMsg);
     onUserMsg(userMsg);
-
-    // 自动标题：首条消息作为标题
     if (chat.messages.length === 1) {
       chat.title = userInput.length > 20 ? userInput.slice(0, 20) + '...' : userInput;
     }
-
     StorageManager.saveChat(chat);
 
-    // 4. 构建上下文并发起请求
-    const context = await this.buildContext();
-    let fullResponse = '';
+    // === 第一段：第一反应（吐槽/共鸣/判断，一句话） ===
+    const ctx1 = await this.buildContext();
+    ctx1[0] = { ...ctx1[0], content: ctx1[0].content + '\n\n【本次只回复第一反应：吐槽/共鸣/判断，一句话，必须带口头禅。不要展开分析，不要给建议。】' };
 
-    DeepSeekClient.streamChat(context, {
-      onChunk: (text) => {
-        fullResponse += text;
-        onAgentChunk(text);
-      },
-      onDone: () => {
-        // 智能拆分为两个气泡
-        const segments = this._splitResponse(fullResponse);
-        const chat = this.getCurrentChat();
-        if (chat) {
-          segments.forEach(seg => {
-            chat.messages.push({
-              role: 'assistant',
-              content: stripMarkdown(seg),
-              timestamp: new Date().toISOString(),
-            });
-          });
-          StorageManager.saveChat(chat);
-        }
-        // 触发用户记忆提取
-        const userMsgCount = chat.messages.filter(m => m.role === 'user').length;
-        if (userMsgCount >= 5) {
-          const memory = UserMemoryManager.get();
-          const lastExtracted = memory.lastExtractedAt ? new Date(memory.lastExtractedAt) : null;
-          const elapsed = lastExtracted ? (Date.now() - lastExtracted.getTime()) : Infinity;
-          if (elapsed > 10 * 60 * 1000) {
-            setTimeout(() => {
-              UserMemoryManager.extractFacts(chat.id).then(() => {
-                UIController._renderUserProfileCard();
-              });
-            }, 2000);
-          }
-        }
-        onAgentDone();
-      },
-      onError: (err) => {
-        if (fullResponse) {
-          const chat = this.getCurrentChat();
-          if (chat) {
-            const segments = this._splitResponse(fullResponse);
-            if (segments.length > 0) {
-              segments[segments.length - 1] = segments[segments.length - 1] + '\n\n[响应中断]';
+    let seg1 = '';
+    try {
+      await new Promise((resolve, reject) => {
+        DeepSeekClient.streamChat(ctx1, {
+          onChunk: (text) => { seg1 += text; onAgentChunk(text); },
+          onDone: () => {
+            const c = this.getCurrentChat();
+            if (c) {
+              c.messages.push({ role: 'assistant', content: stripMarkdown(seg1.trim()), timestamp: new Date().toISOString() });
+              StorageManager.saveChat(c);
             }
-            segments.forEach(seg => {
-              chat.messages.push({
-                role: 'assistant',
-                content: stripMarkdown(seg),
-                timestamp: new Date().toISOString(),
-              });
-            });
-            StorageManager.saveChat(chat);
-          }
+            onAgentSegmentDone(); // 关闭第一个气泡
+            resolve();
+          },
+          onError: reject,
+        });
+      });
+    } catch (err) {
+      onError(err);
+      return;
+    }
+
+    // === 第二段：简短分析或建议 ===
+    const ctx2 = await this.buildContext(); // 重新构建，历史中已包含 seg1
+    ctx2[0] = { ...ctx2[0], content: ctx2[0].content + '\n\n【你刚才给了第一反应。现在继续补充2-3句分析或建议。直接说，不要重复刚才的第一反应。】' };
+
+    let seg2 = '';
+    try {
+      await new Promise((resolve, reject) => {
+        DeepSeekClient.streamChat(ctx2, {
+          onChunk: (text) => { seg2 += text; onAgentChunk(text); },
+          onDone: () => {
+            const c = this.getCurrentChat();
+            if (c) {
+              c.messages.push({ role: 'assistant', content: stripMarkdown(seg2.trim()), timestamp: new Date().toISOString() });
+              StorageManager.saveChat(c);
+            }
+            resolve();
+          },
+          onError: reject,
+        });
+      });
+    } catch (err) {
+      // 第二段失败但第一段已保存 — 标记中断
+      if (seg2) {
+        const c = this.getCurrentChat();
+        if (c) {
+          c.messages.push({ role: 'assistant', content: stripMarkdown(seg2) + '\n\n[响应中断]', timestamp: new Date().toISOString() });
+          StorageManager.saveChat(c);
         }
-        onError(err);
-      },
-    });
+      }
+      onError(err);
+      return;
+    }
+
+    // 记忆提取
+    const finalChat = this.getCurrentChat();
+    const userMsgCount = finalChat.messages.filter(m => m.role === 'user').length;
+    if (userMsgCount >= 5) {
+      const memory = UserMemoryManager.get();
+      const lastExtracted = memory.lastExtractedAt ? new Date(memory.lastExtractedAt) : null;
+      const elapsed = lastExtracted ? (Date.now() - lastExtracted.getTime()) : Infinity;
+      if (elapsed > 10 * 60 * 1000) {
+        setTimeout(() => {
+          UserMemoryManager.extractFacts(finalChat.id).then(() => {
+            UIController._renderUserProfileCard();
+          });
+        }, 2000);
+      }
+    }
+    onAgentDone();
   },
 
   /** 重试最后一条消息（补全中断的响应） */
@@ -2595,6 +2553,13 @@ const UIController = {
         }
         this._streamingBubble.textContent += this._stripMarkdown(chunk);
         this._scrollToBottom();
+      },
+      onAgentSegmentDone: () => {
+        // 第一段结束，关闭当前气泡准备第二段
+        if (this._streamingBubble) {
+          this._streamingBubble.classList.remove('streaming');
+        }
+        this._streamingBubble = null;
       },
       onAgentDone: () => {
         if (this._streamingBubble) {
