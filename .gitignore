@@ -24,3 +24,4 @@ node_modules/
 *.bak
 *~
 gepa_best_prompt_*.txt
+__pycache__/
