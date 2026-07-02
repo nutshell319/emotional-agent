@@ -991,6 +991,11 @@ const SettingsManager = {
       const raw = localStorage.getItem('emotion-agent:settings');
       if (raw) {
         this._cache = { ...this.DEFAULTS, ...JSON.parse(raw) };
+        // 迁移旧默认模型
+        if (this._cache.model === 'deepseek-v4-flash') {
+          this._cache.model = this.DEFAULTS.model;
+          this._save(this._cache);
+        }
       } else {
         this._cache = { ...this.DEFAULTS };
       }
