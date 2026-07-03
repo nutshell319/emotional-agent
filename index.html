@@ -1004,10 +1004,18 @@ input, textarea {
       </div>
 
       <div class="settings-group">
-        <label>OCR API Key <span style="font-weight:400;color:var(--text-muted);font-size:12px;">(ocr.space 免费)</span></label>
+        <label>百度OCR API Key <span style="font-weight:400;color:var(--text-muted);font-size:12px;">(免费5万次/天)</span></label>
         <div class="input-with-icon">
-          <input type="password" class="settings-input" id="settingOcrApiKey" placeholder="输入 ocr.space 的 API Key...">
-          <button class="toggle-pw" data-target="settingOcrApiKey">👁</button>
+          <input type="password" class="settings-input" id="settingBaiduOcrApiKey" placeholder="百度智能云 → 应用列表 → API Key">
+          <button class="toggle-pw" data-target="settingBaiduOcrApiKey">👁</button>
+        </div>
+      </div>
+
+      <div class="settings-group">
+        <label>百度OCR Secret Key</label>
+        <div class="input-with-icon">
+          <input type="password" class="settings-input" id="settingBaiduOcrSecretKey" placeholder="百度智能云 → 应用列表 → Secret Key">
+          <button class="toggle-pw" data-target="settingBaiduOcrSecretKey">👁</button>
         </div>
       </div>
 
@@ -1067,6 +1075,8 @@ const SettingsManager = {
     temperature: 0.7,
     agentName: '小心',
     ocrApiKey: '',
+    baiduOcrApiKey: '',
+    baiduOcrSecretKey: '',
   },
 
   _cache: null,
@@ -1786,51 +1796,90 @@ const ImageUtils = {
    * @returns {Promise<string>} 识别出的文字
    */
   /**
-   * 使用 OCR.space 免费 API 进行文字识别
+   * 使用百度 OCR API 进行文字识别（免费额度 50000次/天）
    * @param {string} dataUrl - base64 图片
    * @param {function} onProgress - 进度回调 (progress 0-100)
    * @returns {Promise<string>} 识别出的文字
    */
   async ocr(dataUrl, onProgress) {
     const settings = SettingsManager.getAll();
-    const apiKey = settings.ocrApiKey || '';
-    if (!apiKey) throw new Error('OCR API Key 未设置，请在设置面板中填入 OCR.space 的 API Key');
+    const apiKey = settings.baiduOcrApiKey || '';
+    const secretKey = settings.baiduOcrSecretKey || '';
+    if (!apiKey || !secretKey) throw new Error('百度OCR Key 未设置，请在设置面板中填入 API Key 和 Secret Key');
 
-    if (onProgress) onProgress(30);
+    if (onProgress) onProgress(20);
 
-    // 去掉 data:image/...;base64, 前缀，OCR.space 需要纯 base64
-    const base64 = dataUrl.replace(/^data:image\/\w+;base64,/, '');
+    // 获取 access_token（缓存30天）
+    const token = await this._getBaiduToken(apiKey, secretKey);
 
-    const formData = new FormData();
-    formData.append('base64Image', 'data:image/jpeg;base64,' + base64);
-    formData.append('language', 'chs');
-    formData.append('isOverlayRequired', 'false');
-    formData.append('OCREngine', '2'); // Engine 2 中文更好
+    if (onProgress) onProgress(50);
 
-    if (onProgress) onProgress(60);
+    // 调用通用文字识别（高精度版）
+    const base64 = dataUrl.replace(/^data:image\/[^;]+;base64,/, '');
+    const params = new URLSearchParams();
+    params.append('image', base64);
+    params.append('language_type', 'CHN_ENG');
+    params.append('detect_direction', 'true');
+    params.append('paragraph', 'true');
 
-    const response = await fetch('https://api.ocr.space/parse/image', {
-      method: 'POST',
-      headers: { 'apikey': apiKey },
-      body: formData,
-    });
+    const response = await fetch(
+      'https://aip.baidubce.com/rest/2.0/ocr/v1/accurate_basic?access_token=' + token,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: params.toString(),
+      }
+    );
 
     if (!response.ok) {
-      throw new Error('OCR API 请求失败 (' + response.status + ')');
+      throw new Error('百度OCR 请求失败 (' + response.status + ')');
     }
 
     const result = await response.json();
     if (onProgress) onProgress(100);
 
-    if (result.IsErroredOnProcessing) {
-      throw new Error('OCR 识别失败: ' + (result.ErrorMessage || '未知错误'));
+    if (result.error_code) {
+      throw new Error('百度OCR 错误: ' + (result.error_msg || result.error_code));
     }
 
-    // 提取所有识别到的文字
-    const texts = (result.ParsedResults || [])
-      .map(r => r.ParsedText || '')
+    // 提取文字，保持段落结构
+    const texts = (result.words_result || [])
+      .map(r => r.words || '')
       .filter(t => t);
-    return texts.join('\n').trim();
+    return texts.join('\n');
+  },
+
+  /**
+   * 获取百度 access_token（带缓存，有效期30天）
+   */
+  _baiduTokenCache: null,
+  async _getBaiduToken(apiKey, secretKey) {
+    const cacheKey = 'baidu_ocr_token_' + apiKey.slice(-8);
+    // 检查缓存
+    try {
+      const cached = JSON.parse(localStorage.getItem(cacheKey));
+      if (cached && cached.expires > Date.now()) {
+        return cached.token;
+      }
+    } catch (e) {}
+
+    const resp = await fetch(
+      'https://aip.baidubce.com/oauth/2.0/token?grant_type=client_credentials&client_id=' +
+      encodeURIComponent(apiKey) + '&client_secret=' + encodeURIComponent(secretKey),
+      { method: 'POST' }
+    );
+    const data = await resp.json();
+    if (data.error) {
+      throw new Error('百度OCR 鉴权失败: ' + (data.error_description || data.error));
+    }
+
+    // 缓存 token（提前1天过期）
+    localStorage.setItem(cacheKey, JSON.stringify({
+      token: data.access_token,
+      expires: Date.now() + (data.expires_in - 86400) * 1000,
+    }));
+
+    return data.access_token;
   },
 };
 
@@ -3055,11 +3104,12 @@ const UIController = {
     });
 
     // 文本类设置：input 事件即时保存（不需要失焦）
-    ['settingApiKey', 'settingBaseURL', 'settingOcrApiKey'].forEach(id => {
+    ['settingApiKey', 'settingBaseURL', 'settingBaiduOcrApiKey', 'settingBaiduOcrSecretKey'].forEach(id => {
       const el = document.getElementById(id);
       const key = id === 'settingApiKey' ? 'apiKey'
         : id === 'settingBaseURL' ? 'baseURL'
-        : 'ocrApiKey';
+        : id === 'settingBaiduOcrApiKey' ? 'baiduOcrApiKey'
+        : 'baiduOcrSecretKey';
       el.addEventListener('input', () => {
         SettingsManager.set(key, el.value);
         this._updateApiStatus();
@@ -3093,7 +3143,8 @@ const UIController = {
     document.getElementById('settingBaseURL').value = s.baseURL || '';
     document.getElementById('settingModel').value = s.model || 'deepseek-v4-pro';
     document.getElementById('settingTemperature').value = s.temperature ?? 0.7;
-    document.getElementById('settingOcrApiKey').value = s.ocrApiKey || '';
+    document.getElementById('settingBaiduOcrApiKey').value = s.baiduOcrApiKey || '';
+    document.getElementById('settingBaiduOcrSecretKey').value = s.baiduOcrSecretKey || '';
     this._updateApiStatus();
     this._updateBranding();
   },
