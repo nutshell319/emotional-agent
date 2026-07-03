@@ -3054,10 +3054,11 @@ const UIController = {
       this._showToast('所有数据已清除', 'info');
     });
 
-    ['settingApiKey', 'settingBaseURL', 'settingTemperature'].forEach(id => {
+    ['settingApiKey', 'settingBaseURL', 'settingTemperature', 'settingOcrApiKey'].forEach(id => {
       const el = document.getElementById(id);
       const key = id === 'settingApiKey' ? 'apiKey'
         : id === 'settingBaseURL' ? 'baseURL'
+        : id === 'settingOcrApiKey' ? 'ocrApiKey'
         : 'temperature';
       el.addEventListener('change', () => {
         let value = el.value;
@@ -3090,6 +3091,7 @@ const UIController = {
     document.getElementById('settingBaseURL').value = s.baseURL || '';
     document.getElementById('settingModel').value = s.model || 'deepseek-v4-pro';
     document.getElementById('settingTemperature').value = s.temperature ?? 0.7;
+    document.getElementById('settingOcrApiKey').value = s.ocrApiKey || '';
     this._updateApiStatus();
     this._updateBranding();
   },
