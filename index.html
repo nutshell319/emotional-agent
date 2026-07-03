@@ -3054,21 +3054,23 @@ const UIController = {
       this._showToast('所有数据已清除', 'info');
     });
 
-    ['settingApiKey', 'settingBaseURL', 'settingTemperature', 'settingOcrApiKey'].forEach(id => {
+    // 文本类设置：input 事件即时保存（不需要失焦）
+    ['settingApiKey', 'settingBaseURL', 'settingOcrApiKey'].forEach(id => {
       const el = document.getElementById(id);
       const key = id === 'settingApiKey' ? 'apiKey'
         : id === 'settingBaseURL' ? 'baseURL'
-        : id === 'settingOcrApiKey' ? 'ocrApiKey'
-        : 'temperature';
-      el.addEventListener('change', () => {
-        let value = el.value;
-        if (id === 'settingTemperature') {
-          const raw = parseFloat(el.value);
-          value = !isNaN(raw) ? raw : 0.7;
-        }
-        SettingsManager.set(key, value);
+        : 'ocrApiKey';
+      el.addEventListener('input', () => {
+        SettingsManager.set(key, el.value);
         this._updateApiStatus();
       });
+    });
+
+    // 数值类设置：change 事件（避免每次按键都触发）
+    document.getElementById('settingTemperature').addEventListener('change', () => {
+      const raw = parseFloat(document.getElementById('settingTemperature').value);
+      SettingsManager.set('temperature', !isNaN(raw) ? raw : 0.7);
+      this._updateApiStatus();
     });
 
     document.getElementById('settingModel').addEventListener('change', (e) => {
