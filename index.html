@@ -907,6 +907,25 @@ input, textarea {
   font-size: 13px; font-weight: 600; cursor: pointer;
 }
 .pf-btn-save:hover { background: rgba(185,142,255,0.25); }
+
+/* OCR 识别中提示 */
+.ocr-status {
+  display: flex; align-items: center; gap: 8px;
+  padding: 10px 16px;
+  color: var(--title);
+  font-size: 13px;
+  animation: msgIn 0.3s ease both;
+}
+.ocr-status .ocr-spinner {
+  width: 16px; height: 16px;
+  border: 2px solid rgba(185,142,255,0.2);
+  border-top-color: var(--title);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.ocr-status.done { color: #4caf50; }
+.ocr-status.error { color: var(--accent); }
 </style>
 </head>
 <body>
@@ -1015,6 +1034,7 @@ input, textarea {
   </aside>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js"></script>
 <script>
 /* ========================================
    Utils
@@ -1750,6 +1770,35 @@ const ImageUtils = {
       reader.readAsDataURL(file);
     });
   },
+
+  /**
+   * 使用 Tesseract.js 对图片进行 OCR 文字识别
+   * @param {string} dataUrl - base64 图片
+   * @param {function} onProgress - 进度回调 (progress 0-100)
+   * @returns {Promise<string>} 识别出的文字
+   */
+  async ocr(dataUrl, onProgress) {
+    const worker = await Tesseract.createWorker({
+      logger: m => {
+        if (m.status === 'recognizing text' && onProgress) {
+          onProgress(Math.round(m.progress * 100));
+        }
+      }
+    });
+    try {
+      await worker.loadLanguage('chi_sim');
+      await worker.initialize('chi_sim');
+      // 设置参数优化聊天截图识别
+      await worker.setParameters({
+        tessedit_pageseg_mode: Tesseract.PSM.AUTO,
+        preserve_interword_spaces: '1',
+      });
+      const { data } = await worker.recognize(dataUrl);
+      return data.text.trim();
+    } finally {
+      await worker.terminate();
+    }
+  },
 };
 
 /* ========================================
@@ -1994,7 +2043,7 @@ const ChatManager = {
 
   /** 发送用户消息并获取流式回复（前端按段落自动拆分气泡） */
   async sendMessage(userInput, uiCallbacks) {
-    const { onUserMsg, onAgentChunk, onAgentDone, onError, onReject, images } = uiCallbacks;
+    const { onUserMsg, onAgentChunk, onAgentDone, onError, onReject } = uiCallbacks;
 
     // 1. 领域预检
     const domainCheck = SafetyGuard.checkDomain(userInput);
@@ -2017,35 +2066,18 @@ const ChatManager = {
       return;
     }
 
-    // 3. 保存用户消息（文本存localStorage，图片仅用于当前API调用）
+    // 3. 保存用户消息
     const chat = this._ensureChat();
-    const displayContent = (images && images.length > 0)
-      ? '[📷聊天截图] ' + (userInput || '帮我看看这个聊天记录')
-      : userInput;
-    const userMsg = { role: 'user', content: displayContent, timestamp: new Date().toISOString() };
+    const userMsg = { role: 'user', content: userInput, timestamp: new Date().toISOString() };
     chat.messages.push(userMsg);
     onUserMsg(userMsg);
     if (chat.messages.length === 1) {
-      chat.title = displayContent.length > 20 ? displayContent.slice(0, 20) + '...' : displayContent;
+      chat.title = userInput.length > 20 ? userInput.slice(0, 20) + '...' : userInput;
     }
     StorageManager.saveChat(chat);
 
-    // 4. 流式请求 — 如果有图片，构建多模态消息
+    // 4. 流式请求
     const context = await this.buildContext();
-    if (images && images.length > 0) {
-      // 将最后一条用户消息替换为多模态格式（图片 + 文本）
-      const apiContent = [
-        { type: 'text', text: userInput || '请识别这张聊天截图的对话内容，然后帮我分析。' },
-        ...images.map(url => ({ type: 'image_url', image_url: { url, detail: 'high' } })),
-      ];
-      // 找到context中最后一条user消息并替换（不修改chat.messages中的存储版本）
-      for (let i = context.length - 1; i >= 0; i--) {
-        if (context[i].role === 'user') {
-          context[i] = { role: 'user', content: apiContent };
-          break;
-        }
-      }
-    }
 
     let fullResponse = '';
 
@@ -2683,9 +2715,10 @@ const UIController = {
     row.className = 'msg-row user';
     let content = this._escapeHtml(this._stripMarkdown(msg.content));
     // 如果消息包含图片标识，渲染为标签
-    const imgTagMatch = content.match(/^\[📷聊天截图\]\s*/);
+    const imgTagMatch = content.match(/^📷 聊天截图/);
     if (imgTagMatch) {
       content = content.slice(imgTagMatch[0].length);
+      content = content.replace(/^识别出的聊天记录：\n/, ''); // 去掉OCR引导语
       content = '<span class="img-tag">📷 聊天截图</span>' + (content || '');
     }
     row.innerHTML = `
@@ -2739,7 +2772,15 @@ const UIController = {
       </div>`;
     return row;
   },
-  _send() {
+
+  _createOcrStatus() {
+    const row = document.createElement('div');
+    row.className = 'ocr-status';
+    row.innerHTML = '<span class="ocr-spinner"></span><span class="ocr-text">🔍 识别聊天记录中...</span>';
+    return row;
+  },
+
+  async _send() {
     const text = this._dom.chatInput.value.trim();
     const hasImages = this._attachedImages.length > 0;
     if (!text && !hasImages) return;
@@ -2748,7 +2789,7 @@ const UIController = {
     this._dom.chatInput.value = '';
     this._dom.chatInput.style.height = 'auto';
 
-    // 暂存图片并在发送后清除
+    // 暂存图片并清除
     const images = [...this._attachedImages];
     this._attachedImages = [];
     this._renderImagePreview();
@@ -2756,12 +2797,50 @@ const UIController = {
     this._dom.emptyState.style.display = 'none';
     this._dom.mainArea.classList.remove('is-empty');
 
+    // 如果有图片，先 OCR 提取文字
+    let ocrText = '';
+    if (images.length > 0) {
+      const ocrStatus = this._createOcrStatus();
+      this._dom.chatMessages.appendChild(ocrStatus);
+      this._scrollToBottom();
+
+      try {
+        for (const img of images) {
+          ocrText += await ImageUtils.ocr(img, (p) => {
+            ocrStatus.querySelector('.ocr-text').textContent = '识别聊天记录中... ' + p + '%';
+          }) + '\n\n';
+        }
+        ocrText = ocrText.trim();
+        ocrStatus.classList.add('done');
+        ocrStatus.querySelector('.ocr-text').textContent = '识别完成';
+        ocrStatus.querySelector('.ocr-spinner').style.display = 'none';
+        setTimeout(() => ocrStatus.remove(), 1000);
+      } catch (e) {
+        console.error('[OCR]', e);
+        ocrStatus.classList.add('error');
+        ocrStatus.querySelector('.ocr-text').textContent = '识别失败: ' + e.message;
+        ocrStatus.querySelector('.ocr-spinner').style.display = 'none';
+        this._dom.btnSend.disabled = false;
+        this._dom.chatInput.value = text;
+        return;
+      }
+    }
+
+    // 拼接最终消息
+    let finalText;
+    if (ocrText) {
+      finalText = '📷 聊天截图\n\n识别出的聊天记录：\n' + ocrText;
+      if (text) finalText += '\n\n用户的问题是：' + text;
+      else finalText += '\n\n请帮我分析这段聊天记录。';
+    } else {
+      finalText = text;
+    }
+
     const typing = this._createTypingIndicator();
     this._dom.chatMessages.appendChild(typing);
     this._scrollToBottom();
 
-    ChatManager.sendMessage(text, {
-      images: images.length > 0 ? images : null,
+    ChatManager.sendMessage(finalText, {
       onUserMsg: (msg) => {
         // 保留思考动画，用户气泡和思考同屏显示
         const bubble = this._createUserBubble(msg);
