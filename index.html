@@ -1066,6 +1066,7 @@ const SettingsManager = {
     model: 'deepseek-v4-pro',
     temperature: 0.7,
     agentName: '小心',
+    ocrApiKey: '',
   },
 
   _cache: null,
@@ -1798,7 +1799,7 @@ const ImageUtils = {
     if (onProgress) onProgress(30);
 
     // 去掉 data:image/...;base64, 前缀，OCR.space 需要纯 base64
-    const base64 = dataUrl.replace(/^data:image/\w+;base64,/, '');
+    const base64 = dataUrl.replace(/^data:image\/\w+;base64,/, '');
 
     const formData = new FormData();
     formData.append('base64Image', 'data:image/jpeg;base64,' + base64);
