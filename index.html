@@ -1849,7 +1849,7 @@ const ChatManager = {
     StorageManager.saveChat(chat);
   },
 
-  /** 按段落自然拆分：空行分隔 → 每个段落一个气泡 */
+  /** 按段落智能拆分：第一段独立（快速反应），后续段落合并到合理长度 */
   _splitResponse(text) {
     text = text.trim();
     if (!text) return [''];
@@ -1857,35 +1857,45 @@ const ChatManager = {
     // 按空行（段落）拆分
     let segments = text.split(/\n{2,}/).map(s => s.trim()).filter(s => s);
 
-    // 如果只有一段且很长，尝试按单换行拆分
+    // 如果没拆出多段，尝试按单换行拆分
     if (segments.length === 1 && segments[0].length > 80) {
       const lines = segments[0].split(/\n/).map(s => s.trim()).filter(s => s);
-      if (lines.length > 1) {
-        // 合并过短的行到前一/后一段
-        const merged = [];
-        for (const line of lines) {
-          if (merged.length > 0 && line.length < 12) {
-            merged[merged.length - 1] += '\n' + line;
-          } else {
-            merged.push(line);
-          }
-        }
-        segments = merged;
-      }
+      if (lines.length > 1) segments = lines;
     }
 
-    // 合并过短的段到相邻段
-    const result = [];
-    for (const seg of segments) {
-      if (result.length > 0 && seg.length < 8) {
-        result[result.length - 1] += '\n' + seg;
+    // 只有一段，直接返回
+    if (segments.length <= 1) {
+      console.log('[Split] 1段（无需拆分）');
+      return segments;
+    }
+
+    // 整体很短（<150字），不拆分，保持一个气泡
+    const totalLen = segments.reduce((sum, s) => sum + s.length, 0);
+    if (totalLen < 150) {
+      console.log('[Split] 1段（总长' + totalLen + '字，不拆分）');
+      return [text];
+    }
+
+    // 策略：第一段独立（快速反应/吐槽），后续段落合并到合理长度
+    const result = [segments[0]];
+    const TARGET_MAX = 200;  // 单个气泡上限
+
+    let current = '';
+    for (let i = 1; i < segments.length; i++) {
+      const seg = segments[i];
+      if (!current) {
+        current = seg;
+      } else if (current.length + seg.length <= TARGET_MAX) {
+        current += '\n\n' + seg;  // 还能合并，继续
       } else {
-        result.push(seg);
+        result.push(current);     // 当前积累已达标，推入
+        current = seg;            // 开始新的合并组
       }
     }
+    if (current) result.push(current);
 
     console.log('[Split]', result.length + '段:', result.map(s => s.length + '字').join(', '));
-    return result.length > 0 ? result : [text];
+    return result;
   },
 
   /** 发送用户消息并获取流式回复（前端按段落自动拆分气泡） */
