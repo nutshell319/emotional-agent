@@ -1849,7 +1849,7 @@ const ChatManager = {
     StorageManager.saveChat(chat);
   },
 
-  /** 按段落智能拆分：第一段独立（快速反应），后续段落合并到合理长度 */
+  /** 智能分段：第一段独立（快速反应），其余合并，最多3段 */
   _splitResponse(text) {
     text = text.trim();
     if (!text) return [''];
@@ -1863,39 +1863,31 @@ const ChatManager = {
       if (lines.length > 1) segments = lines;
     }
 
-    // 只有一段，直接返回
-    if (segments.length <= 1) {
-      console.log('[Split] 1段（无需拆分）');
-      return segments;
-    }
-
-    // 整体很短（<150字），不拆分，保持一个气泡
     const totalLen = segments.reduce((sum, s) => sum + s.length, 0);
-    if (totalLen < 150) {
-      console.log('[Split] 1段（总长' + totalLen + '字，不拆分）');
+
+    // 只有一段或整体很短 → 不拆分
+    if (segments.length <= 1 || totalLen < 150) {
+      console.log('[Split] 1段（' + totalLen + '字）');
       return [text];
     }
 
-    // 策略：第一段独立（快速反应/吐槽），后续段落合并到合理长度
-    const result = [segments[0]];
-    const TARGET_MAX = 200;  // 单个气泡上限
+    // 第一段独立（快速反应），剩余的合并
+    const first = segments[0];
+    const rest = segments.slice(1);
+    const restText = rest.join('\n\n');
 
-    let current = '';
-    for (let i = 1; i < segments.length; i++) {
-      const seg = segments[i];
-      if (!current) {
-        current = seg;
-      } else if (current.length + seg.length <= TARGET_MAX) {
-        current += '\n\n' + seg;  // 还能合并，继续
-      } else {
-        result.push(current);     // 当前积累已达标，推入
-        current = seg;            // 开始新的合并组
-      }
+    if (restText.length <= 250) {
+      // 剩余部分不长 → 合并为1段，共2段
+      console.log('[Split] 2段: ' + first.length + '字, ' + restText.length + '字');
+      return [first, restText];
     }
-    if (current) result.push(current);
 
-    console.log('[Split]', result.length + '段:', result.map(s => s.length + '字').join(', '));
-    return result;
+    // 剩余部分较长 → 在段落边界均分为2段，共3段
+    const mid = Math.ceil(rest.length / 2);
+    const part1 = rest.slice(0, mid).join('\n\n');
+    const part2 = rest.slice(mid).join('\n\n');
+    console.log('[Split] 3段: ' + first.length + '字, ' + part1.length + '字, ' + part2.length + '字');
+    return [first, part1, part2];
   },
 
   /** 发送用户消息并获取流式回复（前端按段落自动拆分气泡） */
