@@ -166,6 +166,14 @@ input, textarea {
 .chat-item.active { background: rgba(185,142,255,0.08); color: var(--text); }
 .chat-item .chat-icon { font-size: 14px; flex-shrink: 0; opacity: 0.6; }
 .chat-item .chat-title { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chat-mbti-tag {
+  font-size: 9px; font-weight: 700;
+  padding: 1px 5px; border-radius: 4px;
+  background: rgba(185,142,255,0.15);
+  color: var(--primary);
+  flex-shrink: 0;
+  letter-spacing: 0.5px;
+}
 .chat-item .chat-delete {
   opacity: 0;
   width: 24px; height: 24px;
@@ -260,6 +268,25 @@ input, textarea {
   transition: all 0.15s;
 }
 .icon-btn:hover { background: rgba(255,255,255,0.06); color: var(--text); }
+
+/* Profile hint bar */
+.profile-hint-bar {
+  padding: 10px 20px;
+  background: rgba(185,142,255,0.06);
+  border-bottom: 1px solid rgba(185,142,255,0.1);
+  display: flex; align-items: center; gap: 8px;
+  flex-shrink: 0; cursor: pointer;
+  transition: background 0.2s;
+}
+.profile-hint-bar:hover { background: rgba(185,142,255,0.12); }
+.profile-hint-icon { font-size: 16px; }
+.profile-hint-text { font-size: 13px; color: var(--text-dim); }
+.profile-hint-link {
+  font-size: 13px; color: var(--primary);
+  background: none; border: none; cursor: pointer;
+  text-decoration: underline; padding: 0;
+}
+.profile-hint-link:hover { color: #d4bfff; }
 
 .chat-messages {
   flex: 1;
@@ -957,6 +984,11 @@ input, textarea {
       <div class="chat-header-actions">
         <button class="icon-btn" id="btnSettings" title="设置 (Ctrl+,)">⚙</button>
       </div>
+    </div>
+    <div class="profile-hint-bar" id="profileHintBar" style="display:none;">
+      <span class="profile-hint-icon">💡</span>
+      <span class="profile-hint-text">还没告诉我是谁 — </span>
+      <button class="profile-hint-link" id="btnProfileHint">点这里设置TA的画像</button>
     </div>
     <div class="chat-messages" id="chatMessages">
       <div class="empty-state" id="emptyState">
@@ -2295,6 +2327,11 @@ const UIController = {
       imgPreviewWrap: document.getElementById('imgPreviewWrap'),
       btnSettings: document.getElementById('btnSettings'),
       btnClearAll: document.getElementById('btnClearAll'),
+      profileHintBar: document.getElementById('profileHintBar'),
+      btnProfileHint: document.getElementById('btnProfileHint'),
+      profileArea: document.getElementById('profileArea'),
+      userProfileArea: document.getElementById('userProfileArea'),
+      mainArea: document.getElementById('mainArea'),
       settingsPanel: document.getElementById('settingsPanel'),
       settingsOverlay: document.getElementById('settingsOverlay'),
       toastContainer: document.getElementById('toastContainer'),
@@ -2334,6 +2371,8 @@ const UIController = {
 
     this._dom.btnSettings.addEventListener('click', () => this._toggleSettings());
     this._dom.btnClearAll.addEventListener('click', () => this._clearAllChats());
+    this._dom.btnProfileHint.addEventListener('click', () => this._openProfileModal());
+    this._dom.profileHintBar.addEventListener('click', () => this._openProfileModal());
 
     // 键盘快捷键
     document.addEventListener('keydown', (e) => {
@@ -2362,9 +2401,11 @@ const UIController = {
       item.className = 'chat-item' + (chat.id === currentId ? ' active' : '');
       item.dataset.chatId = chat.id;
 
+      const hasProfile = chat.subjectProfile && chat.subjectProfile.name;
       const icon = document.createElement('span');
       icon.className = 'chat-icon';
-      icon.textContent = '💬';
+      icon.textContent = hasProfile ? '💜' : '💬';
+      if (hasProfile) icon.title = '对象：' + chat.subjectProfile.name;
 
       const title = document.createElement('span');
       title.className = 'chat-title';
@@ -2377,6 +2418,13 @@ const UIController = {
 
       item.appendChild(icon);
       item.appendChild(title);
+      // 有画像的对话在标题旁显示MBTI标签
+      if (hasProfile && chat.subjectProfile.mbti) {
+        const mbtiTag = document.createElement('span');
+        mbtiTag.className = 'chat-mbti-tag';
+        mbtiTag.textContent = chat.subjectProfile.mbti;
+        item.appendChild(mbtiTag);
+      }
       item.appendChild(delBtn);
       this._dom.chatList.appendChild(item);
 
@@ -2658,7 +2706,11 @@ const UIController = {
   /* ---- 对象画像 ---- */
   _renderProfileCard() {
     const chat = ChatManager.getCurrentChat();
-    if (!chat) { this._dom.profileArea.innerHTML = ''; return; }
+    if (!chat) {
+      this._dom.profileArea.innerHTML = '';
+      this._dom.profileHintBar.style.display = 'none';
+      return;
+    }
 
     const profile = chat.subjectProfile;
     if (!profile || !profile.name) {
@@ -2667,8 +2719,13 @@ const UIController = {
           ＋ 添加对象画像
         </div>`;
       document.getElementById('profileEmpty').addEventListener('click', () => this._openProfileModal());
+      // 显示顶部提示条
+      this._dom.profileHintBar.style.display = 'flex';
       return;
     }
+
+    // 有画像时隐藏提示条
+    this._dom.profileHintBar.style.display = 'none';
 
     // 紧凑标签
     const tags = [];
