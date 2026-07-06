@@ -478,9 +478,13 @@ input, textarea {
   color: var(--title);
 }
 
-/* 分段回复的连续气泡 — 紧凑间距，保留头像 */
+/* 分段回复的连续气泡 — 紧凑间距 */
 .msg-row.agent.consecutive {
   margin-top: 2px;
+}
+/* 头像已移至最新段，旧段隐藏头像 */
+.msg-row.agent.no-avatar .msg-avatar {
+  display: none;
 }
 
 .msg-time {
@@ -2330,7 +2334,7 @@ const UIController = {
   /* ---- DOM 引用 ---- */
   _dom: {},
   _streamingBubble: null,
-  _animTimers: [],        // 分段动画定时器，发送新消息时清除
+  _animId: 0,            // 分段动画版本号，新消息发送时递增，旧动画检测到过期即停止
   _attachedImages: [],  // 当前已附加的图片（base64 data URLs）
 
   init() {
@@ -2859,10 +2863,14 @@ const UIController = {
         fragment.appendChild(this._createUserBubble(msg));
       } else if (msg.role === 'assistant') {
         const prevIsAgent = idx > 0 && chat.messages[idx - 1].role === 'assistant';
+        const nextIsAgent = idx < chat.messages.length - 1 && chat.messages[idx + 1].role === 'assistant';
+        // 头像只显示在连续Agent消息组的最后一段
+        const showAvatar = !nextIsAgent;
         fragment.appendChild(this._createAgentBubble(
           msg,
           idx === chat.messages.length - 1 && msg.content.includes('[响应中断]'),
-          prevIsAgent
+          prevIsAgent,
+          showAvatar
         ));
       }
     });
@@ -2891,9 +2899,9 @@ const UIController = {
     return row;
   },
 
-  _createAgentBubble(msg, wasInterrupted, isConsecutive) {
+  _createAgentBubble(msg, wasInterrupted, isConsecutive, showAvatar = true) {
     const row = document.createElement('div');
-    row.className = 'msg-row agent' + (isConsecutive ? ' consecutive' : '');
+    row.className = 'msg-row agent' + (isConsecutive ? ' consecutive' : '') + (showAvatar ? '' : ' no-avatar');
     row.innerHTML = `
       <div class="msg-avatar">👧🏻</div>
       <div class="msg-content">
@@ -2909,22 +2917,23 @@ const UIController = {
     return row;
   },
 
-  /** 创建带动画的Agent气泡（用于分段展示，_renderMessages不调用此方法） */
-  _createAgentBubbleAnimated(text, index, total) {
-    const isFirst = index === 0;
+  /** 创建打字机就绪的Agent气泡DOM（内容和头像由调用方填充） */
+  _createTypewriterBubble(isFirst, isLast) {
     const row = document.createElement('div');
     row.className = 'msg-row agent stagger-in' + (isFirst ? '' : ' consecutive');
-    // 用style.animationDelay实现逐段延迟（CSS animation + inline delay）
-    row.style.animationDelay = (index * 0.05) + 's';  // 微小延迟，主要靠setTimeout控制时机
-
     const now = new Date().toISOString();
     row.innerHTML = `
-      ${isFirst ? '<div class="msg-avatar">👧🏻</div>' : ''}
+      <div class="msg-avatar">👧🏻</div>
       <div class="msg-content">
-        <div class="msg-bubble">${this._escapeHtml(this._stripMarkdown(text))}</div>
+        <div class="msg-bubble"></div>
         ${isFirst ? '<div class="msg-time">' + this._formatTime(now) + '</div>' : ''}
       </div>`;
     return row;
+  },
+
+  /** Promise-based sleep */
+  _sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
   },
 
   _createRejectCard(message) {
@@ -2964,9 +2973,8 @@ const UIController = {
     const hasImages = this._attachedImages.length > 0;
     if (!text && !hasImages) return;
 
-    // 清除上一次残留的分段动画定时器
-    this._animTimers.forEach(t => clearTimeout(t));
-    this._animTimers = [];
+    // 递增动画版本号，使上一次未完成的分段动画自动停止
+    const animId = ++this._animId;
 
     this._dom.btnSend.disabled = true;
     this._dom.chatInput.value = '';
@@ -3032,28 +3040,53 @@ const UIController = {
         this._renderSidebar();
         this._dom.chatTitle.textContent = ChatManager.getCurrentChat()?.title || '新对话';
       },
-      onAgentSegments: (segments) => {
+      onAgentSegments: async (segments) => {
         // 移除思考动画
         typing.remove();
 
-        // 后台已分好段，逐段动画弹出
-        const totalSegments = segments.length;
-        const staggerMs = 400;  // 每段之间的延迟
+        // 后台已分好段 → 逐段打字机效果 + 头像只在最新段显示
+        const typeSpeed = 15;  // 每个字符间隔 ms
+        const segmentGap = 280;  // 段与段之间的停顿 ms
+        let prevRow = null;
 
-        segments.forEach((segText, i) => {
-          const timer = setTimeout(() => {
-            const row = this._createAgentBubbleAnimated(segText, i, totalSegments);
-            this._dom.chatMessages.appendChild(row);
+        for (let i = 0; i < segments.length; i++) {
+          // 被新消息取消
+          if (this._animId !== animId) return;
+
+          if (i > 0) await this._sleep(segmentGap);
+          if (this._animId !== animId) return;
+
+          // 头像从上一段挪到当前段：隐藏上一段的头像
+          if (prevRow) {
+            const prevAvatar = prevRow.querySelector('.msg-avatar');
+            if (prevAvatar) prevAvatar.style.display = 'none';
+            prevRow.classList.add('no-avatar');
+          }
+
+          const isFirst = i === 0;
+          const isLast = i === segments.length - 1;
+          const row = this._createTypewriterBubble(isFirst, isLast);
+          this._dom.chatMessages.appendChild(row);
+          this._scrollToBottom();
+
+          // 打字机逐字输出
+          const bubbleEl = row.querySelector('.msg-bubble');
+          const cleaned = this._stripMarkdown(segments[i]);
+          for (let j = 0; j < cleaned.length; j++) {
+            if (this._animId !== animId) return;
+            bubbleEl.textContent += cleaned[j];
             this._scrollToBottom();
+            await this._sleep(typeSpeed);
+          }
 
-            // 最后一段完成后恢复输入
-            if (i === totalSegments - 1) {
-              this._dom.btnSend.disabled = false;
-              this._dom.chatInput.focus();
-            }
-          }, i * staggerMs);
-          this._animTimers.push(timer);
-        });
+          prevRow = row;
+        }
+
+        // 全部完成，恢复输入
+        if (this._animId === animId) {
+          this._dom.btnSend.disabled = false;
+          this._dom.chatInput.focus();
+        }
       },
       onError: (err) => {
         typing.remove();
