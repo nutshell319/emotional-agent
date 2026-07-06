@@ -891,6 +891,14 @@ input, textarea {
   flex-shrink: 0;
 }
 .user-profile-card:hover .pf-edit-icon { opacity: 1; }
+.pf-fact-badge {
+  font-size: 10px; padding: 1px 6px;
+  border-radius: 8px;
+  background: rgba(185,142,255,0.12);
+  color: var(--primary);
+  flex-shrink: 0;
+  cursor: default;
+}
 
 .user-profile-card-empty {
   margin: 0 8px 4px 8px;
@@ -947,6 +955,26 @@ input, textarea {
 .user-facts-section .facts-empty {
   font-size: 11px; color: var(--text-muted);
   font-style: italic;
+}
+.facts-global-hint {
+  font-size: 10px; font-weight: 400; color: var(--accent);
+  font-style: normal;
+}
+.facts-clear-all {
+  margin-top: 10px;
+  padding: 6px 14px;
+  border-radius: 6px;
+  border: 1px solid rgba(232,93,117,0.25);
+  background: transparent;
+  color: var(--accent);
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.facts-clear-all:hover {
+  background: rgba(232,93,117,0.1);
+  border-color: rgba(232,93,117,0.5);
+}
   padding: 4px 6px;
 }
 .pf-btn-cancel:hover { color: var(--text); }
@@ -1434,7 +1462,7 @@ const UserMemoryManager = {
       text += '\n';
     }
 
-    text += '自然地运用这些了解——该提的时候提一句"你上次不是说..."，别像背档案一样全抖出来。';
+    text += '注意：以上画像和记忆来自不同时期的对话，可能涉及不同的人或已过时。仅在确实相关时自然提及，不要假设当前对话一定涉及上述记忆中的同一个人。如果不确定某项记忆是否适用于当前场景，宁可不提。';
 
     return text;
   },
@@ -1445,7 +1473,7 @@ const UserMemoryManager = {
     const userMessages = chatMessages.filter(m => m.role === 'user').map(m => m.content);
     const recentMsgs = userMessages.slice(-10).join('\n---\n');
 
-    return '你是一个用户画像提取器。从以下对话中提取关于"用户自己"的关键事实。\n\n只提取用户明确透露的关于自己的信息，比如：\n- 依恋风格（焦虑型/回避型/安全型）\n- 重要经历（分手时间、感情历史）\n- 性格特征（敏感、容易焦虑、不擅表达）\n- 感情需求（需要安全感、害怕冲突）\n- 行为模式（一吵架就冷战、习惯性忍让）\n\n不要提取关于"对方/对象"的信息——那些属于对象画像。\n\n输出格式：每行一条事实，用 "- " 开头。每条事实简洁明确，不超过20个字。\n如果没有发现新事实，输出 "无"。\n\n对话内容：\n---\n' + recentMsgs + '\n---\n\n用户关键事实：';
+    return '你是一个用户画像提取器。从以下对话中提取关于"用户自己"的稳定特质和经历。\n\n只提取用户明确透露的关于自己的信息，比如：\n- 依恋风格（焦虑型/回避型/安全型）\n- 重要经历（分手时间、感情历史、个人成长转折）\n- 性格特征（敏感、容易焦虑、不擅表达、讨好型人格）\n- 感情需求（需要安全感、害怕冲突、需要空间）\n- 行为模式（一吵架就冷战、习惯性忍让、遇到矛盾先逃避）\n\n严格禁止提取以下内容：\n- 任何涉及"对象/TA/对方/他/她"做了什么或没做什么的事实（如"对象不理我""TA喜欢冷战""他出轨了"）\n- 只适用于当前对话场景的临时信息\n- 用户只是在转述或描述别人的行为\n\n只提取用户自身的、跨场景适用的稳定特质。不确定是否该提取时，宁可不提取。\n\n输出格式：每行一条事实，用 "- " 开头。每条事实简洁明确，不超过20个字。\n如果没有发现值得长期记住的新事实，输出 "无"。\n\n对话内容：\n---\n' + recentMsgs + '\n---\n\n用户关键事实：';
   },
 
   /** 异步提取事实 */
@@ -2625,7 +2653,8 @@ const UIController = {
     if (memory.age) tags.push('<span class="pf-tag">' + this._escapeHtml(memory.age) + '岁</span>');
 
     const factCount = memory.facts.length;
-    const subText = tags.length > 0 ? tags.join('') : (factCount > 0 ? factCount + '条记忆' : '');
+    const tagsHtml = tags.length > 0 ? tags.join('') : '';
+    const factBadge = factCount > 0 ? '<span class="pf-fact-badge" title="' + factCount + '条全局记忆，所有对话都会引用">🧠' + factCount + '</span>' : '';
 
     this._dom.userProfileArea.innerHTML = `
       <div class="user-profile-card" id="userProfileCard">
@@ -2633,8 +2662,9 @@ const UIController = {
           <div class="pf-avatar">👤</div>
           <div class="pf-info">
             <div class="pf-name">${this._escapeHtml(memory.name || '我')}</div>
-            ${subText ? '<div class="pf-sub">' + subText + '</div>' : ''}
+            ${tagsHtml ? '<div class="pf-sub">' + tagsHtml + '</div>' : ''}
           </div>
+          ${factBadge}
           <span class="pf-edit-icon">✎</span>
         </div>
       </div>`;
@@ -2649,13 +2679,14 @@ const UIController = {
     overlay.id = 'userProfileModalOverlay';
     let factsHTML = '';
     if (memory.facts.length > 0) {
-      factsHTML = '<div class="user-facts-section"><div class="facts-header">自动提取的记忆</div>';
+      factsHTML = '<div class="user-facts-section">'
+        + '<div class="facts-header">🧠 自动提取的记忆 <span class="facts-global-hint">（所有对话共享，Agent 在每次对话中都会引用）</span></div>';
       memory.facts.forEach(f => {
         factsHTML += '<div class="fact-item" data-fact-id="' + f.id + '"><span class="fact-text">' + this._escapeHtml(f.content) + '</span><button class="fact-del" title="删除">×</button></div>';
       });
-      factsHTML += '</div>';
+      factsHTML += '<button class="facts-clear-all" id="btnClearFacts">清除全部记忆</button></div>';
     } else {
-      factsHTML = '<div class="user-facts-section"><div class="facts-header">自动提取的记忆</div><div class="facts-empty">暂无自动提取的记忆，多聊几天就有了</div></div>';
+      factsHTML = '<div class="user-facts-section"><div class="facts-header">🧠 自动提取的记忆</div><div class="facts-empty">暂无自动提取的记忆，多聊几天就有了</div></div>';
     }
 
     overlay.innerHTML = `
@@ -2711,6 +2742,22 @@ const UIController = {
         this._showToast('记忆已删除', 'success');
       });
     });
+
+    // 清除全部记忆按钮
+    const btnClearFacts = overlay.querySelector('#btnClearFacts');
+    if (btnClearFacts) {
+      btnClearFacts.addEventListener('click', () => {
+        if (!confirm('确定清除全部自动提取的记忆吗？此操作不可撤销。')) return;
+        const memory = UserMemoryManager.get();
+        memory.facts = [];
+        memory.lastExtractedAt = null;
+        UserMemoryManager.save(memory);
+        this._renderUserProfileCard();
+        close();
+        this._openUserProfileModal();
+        this._showToast('全部记忆已清除', 'success');
+      });
+    }
 
     document.getElementById('upfSave').addEventListener('click', () => {
       const data = {
