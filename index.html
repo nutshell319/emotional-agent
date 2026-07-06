@@ -482,9 +482,9 @@ input, textarea {
 .msg-row.agent.consecutive {
   margin-top: 2px;
 }
-/* 头像已移至最新段，旧段隐藏头像 */
+/* 头像已移至最新段，旧段占位保留不塌陷 */
 .msg-row.agent.no-avatar .msg-avatar {
-  display: none;
+  visibility: hidden;
 }
 
 .msg-time {
@@ -3059,7 +3059,7 @@ const UIController = {
           // 头像从上一段挪到当前段：隐藏上一段的头像
           if (prevRow) {
             const prevAvatar = prevRow.querySelector('.msg-avatar');
-            if (prevAvatar) prevAvatar.style.display = 'none';
+            if (prevAvatar) prevAvatar.style.visibility = 'hidden';
             prevRow.classList.add('no-avatar');
           }
 
