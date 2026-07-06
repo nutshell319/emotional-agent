@@ -503,6 +503,24 @@ input, textarea {
   animation: msgIn 0.45s cubic-bezier(.22,1,.36,1) both;
 }
 
+/* Stagger bubble entrance animation */
+.msg-row.agent.stagger-in {
+  animation: staggerBubbleIn 0.45s cubic-bezier(.22,1,.36,1) both;
+}
+.msg-row.agent.stagger-in.consecutive {
+  margin-top: 2px;
+}
+@keyframes staggerBubbleIn {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 /* Error bubble */
 .msg-row.error .msg-bubble {
   border: 1px solid rgba(232,93,117,0.3) !important;
@@ -2155,9 +2173,9 @@ const ChatManager = {
     return [first, part1, part2];
   },
 
-  /** 发送用户消息并获取流式回复（前端按段落自动拆分气泡） */
+  /** 发送用户消息并获取流式回复（后台累积→分好段→逐段动画弹出） */
   async sendMessage(userInput, uiCallbacks) {
-    const { onUserMsg, onAgentChunk, onAgentDone, onError, onReject } = uiCallbacks;
+    const { onUserMsg, onAgentSegments, onError, onReject } = uiCallbacks;
 
     // 1. 领域预检
     const domainCheck = SafetyGuard.checkDomain(userInput);
@@ -2175,8 +2193,7 @@ const ChatManager = {
         { role: 'assistant', content: crisisResponse, timestamp: new Date().toISOString() }
       );
       StorageManager.saveChat(chat);
-      onAgentChunk(crisisResponse);
-      onAgentDone();
+      onAgentSegments([crisisResponse]);  // 危机响应也走分段动画
       return;
     }
 
@@ -2190,7 +2207,7 @@ const ChatManager = {
     }
     StorageManager.saveChat(chat);
 
-    // 4. 流式请求
+    // 4. 流式请求 — 后台静默累积完整响应
     const context = await this.buildContext();
 
     let fullResponse = '';
@@ -2198,7 +2215,7 @@ const ChatManager = {
     DeepSeekClient.streamChat(context, {
       onChunk: (text) => {
         fullResponse += text;
-        onAgentChunk(text);
+        // 后台累积，不调用UI回调——等全部收完再分段动画展示
       },
       onDone: () => {
         // 按段落拆分为多个气泡
@@ -2228,7 +2245,8 @@ const ChatManager = {
             }, 2000);
           }
         }
-        onAgentDone();
+        // 分段传递给UI做逐段动画
+        onAgentSegments(segments);
       },
       onError: (err) => {
         if (fullResponse) {
@@ -2247,8 +2265,11 @@ const ChatManager = {
             });
             StorageManager.saveChat(chat);
           }
+          // 即使是错误，也展示已有的分段
+          onAgentSegments(segments);
+        } else {
+          onError(err);
         }
-        onError(err);
       },
     });
   },
@@ -2309,6 +2330,7 @@ const UIController = {
   /* ---- DOM 引用 ---- */
   _dom: {},
   _streamingBubble: null,
+  _animTimers: [],        // 分段动画定时器，发送新消息时清除
   _attachedImages: [],  // 当前已附加的图片（base64 data URLs）
 
   init() {
@@ -2887,6 +2909,24 @@ const UIController = {
     return row;
   },
 
+  /** 创建带动画的Agent气泡（用于分段展示，_renderMessages不调用此方法） */
+  _createAgentBubbleAnimated(text, index, total) {
+    const isFirst = index === 0;
+    const row = document.createElement('div');
+    row.className = 'msg-row agent stagger-in' + (isFirst ? '' : ' consecutive');
+    // 用style.animationDelay实现逐段延迟（CSS animation + inline delay）
+    row.style.animationDelay = (index * 0.05) + 's';  // 微小延迟，主要靠setTimeout控制时机
+
+    const now = new Date().toISOString();
+    row.innerHTML = `
+      ${isFirst ? '<div class="msg-avatar">👧🏻</div>' : ''}
+      <div class="msg-content">
+        <div class="msg-bubble">${this._escapeHtml(this._stripMarkdown(text))}</div>
+        ${isFirst ? '<div class="msg-time">' + this._formatTime(now) + '</div>' : ''}
+      </div>`;
+    return row;
+  },
+
   _createRejectCard(message) {
     const card = document.createElement('div');
     card.className = 'reject-card';
@@ -2923,6 +2963,10 @@ const UIController = {
     const text = this._dom.chatInput.value.trim();
     const hasImages = this._attachedImages.length > 0;
     if (!text && !hasImages) return;
+
+    // 清除上一次残留的分段动画定时器
+    this._animTimers.forEach(t => clearTimeout(t));
+    this._animTimers = [];
 
     this._dom.btnSend.disabled = true;
     this._dom.chatInput.value = '';
@@ -2988,35 +3032,31 @@ const UIController = {
         this._renderSidebar();
         this._dom.chatTitle.textContent = ChatManager.getCurrentChat()?.title || '新对话';
       },
-      onAgentChunk: (chunk) => {
-        if (!this._streamingBubble) {
-          // 第一个chunk到达，移除思考动画
-          typing.remove();
-          const row = document.createElement('div');
-          row.className = 'msg-row agent';
-          row.innerHTML = `
-            <div class="msg-avatar">👧🏻</div>
-            <div class="msg-content">
-              <div class="msg-bubble streaming"></div>
-            </div>`;
-          this._streamingBubble = row.querySelector('.msg-bubble');
-          this._dom.chatMessages.appendChild(row);
-        }
-        this._streamingBubble.textContent += this._stripMarkdown(chunk);
-        this._scrollToBottom();
-      },
-      onAgentDone: () => {
-        if (this._streamingBubble) {
-          this._streamingBubble.classList.remove('streaming');
-        }
-        this._streamingBubble = null;
-        this._dom.btnSend.disabled = false;
-        this._dom.chatInput.focus();
-        this._renderMessages();
+      onAgentSegments: (segments) => {
+        // 移除思考动画
+        typing.remove();
+
+        // 后台已分好段，逐段动画弹出
+        const totalSegments = segments.length;
+        const staggerMs = 400;  // 每段之间的延迟
+
+        segments.forEach((segText, i) => {
+          const timer = setTimeout(() => {
+            const row = this._createAgentBubbleAnimated(segText, i, totalSegments);
+            this._dom.chatMessages.appendChild(row);
+            this._scrollToBottom();
+
+            // 最后一段完成后恢复输入
+            if (i === totalSegments - 1) {
+              this._dom.btnSend.disabled = false;
+              this._dom.chatInput.focus();
+            }
+          }, i * staggerMs);
+          this._animTimers.push(timer);
+        });
       },
       onError: (err) => {
         typing.remove();
-        this._streamingBubble = null;
         this._dom.btnSend.disabled = false;
 
         const row = document.createElement('div');
