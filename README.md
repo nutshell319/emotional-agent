@@ -1,5 +1,5 @@
 <h1 align="center">
-  👧🏻 小暖 — 情感沟通助手
+  👧🏻 小心 — 情感沟通助手
 </h1>
 
 <p align="center">
