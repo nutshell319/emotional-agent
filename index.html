@@ -456,6 +456,7 @@ input, textarea {
   white-space: pre-wrap;
   word-break: break-word;
   position: relative;
+  overflow: visible;
 }
 .msg-row.user .msg-bubble {
   background: rgba(255,255,255,0.06);
@@ -497,6 +498,24 @@ input, textarea {
   padding: 0 4px;
 }
 .msg-row.user .msg-time { text-align: right; }
+
+/* 复制按钮 — hover 时在气泡右上角浮现 */
+.msg-copy-btn {
+  position: absolute; top: 4px; right: 4px;
+  width: 24px; height: 24px;
+  border-radius: 6px;
+  background: rgba(0,0,0,0.5);
+  color: var(--text-dim);
+  font-size: 12px;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.2s, background 0.15s, color 0.15s;
+  z-index: 2;
+}
+.msg-row:hover .msg-copy-btn { opacity: 1; }
+.msg-copy-btn:hover { background: rgba(255,255,255,0.12); color: var(--text); }
+.msg-copy-btn.copied { background: var(--title); color: #fff; }
 
 /* Reject card */
 .reject-card {
@@ -2425,6 +2444,9 @@ const UIController = {
   _streamingBubble: null,
   _animId: 0,            // 分段动画版本号，新消息发送时递增，旧动画检测到过期即停止
   _attachedImages: [],  // 当前已附加的图片（base64 data URLs）
+  _inputHistory: [],     // 用户发送的消息历史
+  _inputHistoryIdx: -1,  // 当前历史索引，-1表示在"新输入"位置
+  _inputDraft: '',       // 按上键前暂存的当前输入框内容
 
   init() {
     this._dom = {
@@ -2473,6 +2495,33 @@ const UIController = {
       if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
         this._send();
+        return;
+      }
+      // 上下键调取历史消息
+      if (this._inputHistory.length > 0) {
+        if (e.key === 'ArrowUp') {
+          e.preventDefault();
+          if (this._inputHistoryIdx === -1) {
+            this._inputDraft = this._dom.chatInput.value;
+            this._inputHistoryIdx = this._inputHistory.length - 1;
+          } else if (this._inputHistoryIdx > 0) {
+            this._inputHistoryIdx--;
+          }
+          this._dom.chatInput.value = this._inputHistory[this._inputHistoryIdx];
+          this._dom.chatInput.style.height = 'auto';
+          this._dom.chatInput.style.height = Math.min(this._dom.chatInput.scrollHeight, 120) + 'px';
+        } else if (e.key === 'ArrowDown') {
+          e.preventDefault();
+          if (this._inputHistoryIdx >= 0 && this._inputHistoryIdx < this._inputHistory.length - 1) {
+            this._inputHistoryIdx++;
+            this._dom.chatInput.value = this._inputHistory[this._inputHistoryIdx];
+          } else {
+            this._inputHistoryIdx = -1;
+            this._dom.chatInput.value = this._inputDraft;
+          }
+          this._dom.chatInput.style.height = 'auto';
+          this._dom.chatInput.style.height = Math.min(this._dom.chatInput.scrollHeight, 120) + 'px';
+        }
       }
     });
     this._dom.chatInput.addEventListener('input', () => {
@@ -2481,6 +2530,35 @@ const UIController = {
       // 发送按钮呼吸态：有内容时发光
       const hasText = this._dom.chatInput.value.trim().length > 0;
       this._dom.btnSend.classList.toggle('has-text', hasText);
+    });
+
+    // 复制按钮 — 委托在聊天区域
+    this._dom.chatMessages.addEventListener('click', (e) => {
+      const btn = e.target.closest('.msg-copy-btn');
+      if (!btn) return;
+      const bubble = btn.closest('.msg-bubble');
+      // 获取气泡文本（排除按钮自身的文字）
+      const text = Array.from(bubble.childNodes)
+        .filter(n => n !== btn && n.nodeType === Node.TEXT_NODE)
+        .map(n => n.textContent).join('').trim()
+        || bubble.textContent.replace('📋', '').trim();
+      navigator.clipboard.writeText(text).then(() => {
+        btn.textContent = '✓';
+        btn.classList.add('copied');
+        setTimeout(() => { btn.textContent = '📋'; btn.classList.remove('copied'); }, 1200);
+      }).catch(() => {
+        // fallback for non-HTTPS
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.position = 'fixed'; ta.style.left = '-9999px';
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+        btn.textContent = '✓';
+        btn.classList.add('copied');
+        setTimeout(() => { btn.textContent = '📋'; btn.classList.remove('copied'); }, 1200);
+      });
     });
 
     // 图片上传
@@ -3040,7 +3118,7 @@ const UIController = {
     row.innerHTML = `
       <div class="msg-avatar">👤</div>
       <div class="msg-content">
-        <div class="msg-bubble">${content}</div>
+        <div class="msg-bubble">${content}<button class="msg-copy-btn" title="复制">📋</button></div>
         <div class="msg-time">${this._formatTime(msg.timestamp)}</div>
       </div>`;
     return row;
@@ -3052,7 +3130,7 @@ const UIController = {
     row.innerHTML = `
       <div class="msg-avatar">👧🏻</div>
       <div class="msg-content">
-        <div class="msg-bubble">${this._escapeHtml(this._stripMarkdown(msg.content))}</div>
+        <div class="msg-bubble">${this._escapeHtml(this._stripMarkdown(msg.content))}<button class="msg-copy-btn" title="复制">📋</button></div>
         ${showAvatar ? '<div class="msg-time">' + this._formatTime(msg.timestamp) + '</div>' : ''}
         ${wasInterrupted ? '<span class="continue-hint" data-action="continue">点击继续生成 →</span>' : ''}
       </div>`;
@@ -3072,7 +3150,7 @@ const UIController = {
     row.innerHTML = `
       <div class="msg-avatar">👧🏻</div>
       <div class="msg-content">
-        <div class="msg-bubble"></div>
+        <div class="msg-bubble"><button class="msg-copy-btn" title="复制">📋</button></div>
         ${isLast ? '<div class="msg-time">' + this._formatTime(now) + '</div>' : ''}
       </div>`;
     return row;
@@ -3177,6 +3255,14 @@ const UIController = {
     const typing = this._createTypingIndicator();
     this._dom.chatMessages.appendChild(typing);
     this._scrollToBottom();
+
+    // 记录到输入历史，去重
+    if (text && (!this._inputHistory.length || this._inputHistory[this._inputHistory.length - 1] !== text)) {
+      this._inputHistory.push(text);
+    }
+    if (this._inputHistory.length > 100) this._inputHistory.shift();
+    this._inputHistoryIdx = -1;
+    this._inputDraft = '';
 
     ChatManager.sendMessage(finalText, {
       onUserMsg: (msg) => {
