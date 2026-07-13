@@ -306,7 +306,8 @@ input, textarea {
   transition: opacity 0.3s ease;
 }
 .empty-state[style*="display: none"] { opacity: 0; }
-.empty-icon { font-size: 56px; opacity: 0.4; transition: opacity 0.3s ease; }
+.empty-icon { font-size: 56px; opacity: 0.4; transition: opacity 0.3s ease; animation: floatIcon 3s ease-in-out infinite; }
+@keyframes floatIcon { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
 .empty-text { font-size: 15px; }
 .empty-hint { font-size: 12px; opacity: 0.6; }
 
@@ -335,7 +336,7 @@ input, textarea {
   line-height: 1.5;
   transition: height 0.15s ease, border-color 0.25s ease;
 }
-.chat-input:focus { border-color: var(--title); }
+.chat-input:focus { border-color: var(--title); box-shadow: 0 0 0 3px rgba(185,142,255,0.12); }
 .chat-input::placeholder { color: var(--text-muted); }
 .send-btn {
   width: 40px; height: 40px;
@@ -348,7 +349,9 @@ input, textarea {
   transition: opacity 0.25s ease, transform 0.25s ease, background 0.25s ease;
 }
 .send-btn:hover { opacity: 0.85; transform: scale(1.05); }
-.send-btn:disabled { opacity: 0.35; cursor: default; transform: scale(0.95); }
+.send-btn:disabled { opacity: 0.35; cursor: default; transform: scale(0.95); animation: none; }
+.send-btn.has-text { box-shadow: 0 0 16px rgba(185,142,255,0.35); animation: btnPulse 2s ease-in-out infinite; }
+@keyframes btnPulse { 0%, 100% { box-shadow: 0 0 12px rgba(185,142,255,0.25); } 50% { box-shadow: 0 0 22px rgba(185,142,255,0.5); } }
 
 /* 图片上传按钮 */
 .img-btn {
@@ -1149,7 +1152,7 @@ const SettingsManager = {
   DEFAULTS: {
     apiKey: '',
     baseURL: 'https://api.deepseek.com',
-    model: 'deepseek-v4-pro',
+    model: 'deepseek-v4-flash',
     temperature: 0.7,
     agentName: 'Warmth',
     ocrApiKey: '',
@@ -1167,7 +1170,7 @@ const SettingsManager = {
       if (raw) {
         this._cache = { ...this.DEFAULTS, ...JSON.parse(raw) };
         // 迁移旧模型名
-        if (this._cache.model === 'deepseek-v4-flash' || this._cache.model === 'deepseek-v4-pro[1M]') {
+        if (this._cache.model === 'deepseek-v4-pro[1M]') {
           this._cache.model = this.DEFAULTS.model;
           this._save(this._cache);
         }
@@ -2419,6 +2422,9 @@ const UIController = {
     this._dom.chatInput.addEventListener('input', () => {
       this._dom.chatInput.style.height = 'auto';
       this._dom.chatInput.style.height = Math.min(this._dom.chatInput.scrollHeight, 120) + 'px';
+      // 发送按钮呼吸态：有内容时发光
+      const hasText = this._dom.chatInput.value.trim().length > 0;
+      this._dom.btnSend.classList.toggle('has-text', hasText);
     });
 
     // 图片上传
@@ -2909,19 +2915,24 @@ const UIController = {
     const fragment = document.createDocumentFragment();
 
     chat.messages.forEach((msg, idx) => {
+      const staggerDelay = (idx * 35) + 'ms';
       if (msg.role === 'user') {
-        fragment.appendChild(this._createUserBubble(msg));
+        const bubble = this._createUserBubble(msg);
+        bubble.style.animationDelay = staggerDelay;
+        fragment.appendChild(bubble);
       } else if (msg.role === 'assistant') {
         const prevIsAgent = idx > 0 && chat.messages[idx - 1].role === 'assistant';
         const nextIsAgent = idx < chat.messages.length - 1 && chat.messages[idx + 1].role === 'assistant';
         // 头像只显示在连续Agent消息组的最后一段
         const showAvatar = !nextIsAgent;
-        fragment.appendChild(this._createAgentBubble(
+        const bubble = this._createAgentBubble(
           msg,
           idx === chat.messages.length - 1 && msg.content.includes('[响应中断]'),
           prevIsAgent,
           showAvatar
-        ));
+        );
+        bubble.style.animationDelay = staggerDelay;
+        fragment.appendChild(bubble);
       }
     });
 
@@ -3027,6 +3038,7 @@ const UIController = {
     const animId = ++this._animId;
 
     this._dom.btnSend.disabled = true;
+    this._dom.btnSend.classList.remove('has-text');
     this._dom.chatInput.value = '';
     this._dom.chatInput.style.height = 'auto';
 
@@ -3095,8 +3107,13 @@ const UIController = {
         typing.remove();
 
         // 后台已分好段 → 逐段打字机效果 + 头像只在最新段显示
-        const typeSpeed = 15;  // 每个字符间隔 ms
         const segmentGap = 280;  // 段与段之间的停顿 ms
+        const getTypeSpeed = (text) => {
+          const len = text.length;
+          if (len < 50) return 22;     // 短段落慢一点，有"斟酌措辞"感
+          if (len < 150) return 15;    // 中等段落正常速度
+          return 10;                    // 长段落略快，减少等待感
+        };
         let prevRow = null;
 
         for (let i = 0; i < segments.length; i++) {
@@ -3119,14 +3136,15 @@ const UIController = {
           this._dom.chatMessages.appendChild(row);
           this._scrollToBottom();
 
-          // 打字机逐字输出
+          // 打字机逐字输出（速度自适应段落长度）
           const bubbleEl = row.querySelector('.msg-bubble');
           const cleaned = this._stripMarkdown(segments[i]);
+          const speed = getTypeSpeed(cleaned);
           for (let j = 0; j < cleaned.length; j++) {
             if (this._animId !== animId) return;
             bubbleEl.textContent += cleaned[j];
             this._scrollToBottom();
-            await this._sleep(typeSpeed);
+            await this._sleep(speed);
           }
 
           prevRow = row;
@@ -3208,7 +3226,10 @@ const UIController = {
 
   _scrollToBottom() {
     requestAnimationFrame(() => {
-      this._dom.chatMessages.scrollTop = this._dom.chatMessages.scrollHeight;
+      this._dom.chatMessages.scrollTo({
+        top: this._dom.chatMessages.scrollHeight,
+        behavior: 'smooth'
+      });
     });
   },
 
@@ -3321,7 +3342,7 @@ const UIController = {
     document.getElementById('settingAgentName').value = s.agentName || 'Warmth';
     document.getElementById('settingApiKey').value = s.apiKey || '';
     document.getElementById('settingBaseURL').value = s.baseURL || '';
-    document.getElementById('settingModel').value = s.model || 'deepseek-v4-pro';
+    document.getElementById('settingModel').value = s.model || 'deepseek-v4-flash';
     document.getElementById('settingTemperature').value = s.temperature ?? 0.7;
     document.getElementById('settingBaiduOcrApiKey').value = s.baiduOcrApiKey || '';
     document.getElementById('settingBaiduOcrSecretKey').value = s.baiduOcrSecretKey || '';
