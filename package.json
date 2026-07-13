@@ -1,15 +1,15 @@
 {
-  "name": "emotional-agent",
-  "version": "1.0.0",
-  "description": "小心 — 情感沟通助手",
+  "name": "warmth",
+  "version": "2.0.0",
+  "description": "Warmth — 情感沟通助手",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
     "build": "electron-builder --win portable"
   },
   "build": {
-    "appId": "com.xiaoxin.emotional-agent",
-    "productName": "小心",
+    "appId": "com.warmth.emotional-agent",
+    "productName": "Warmth",
     "win": {
       "target": "portable",
       "icon": "icon.ico"

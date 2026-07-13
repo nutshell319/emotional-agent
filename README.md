@@ -1,5 +1,5 @@
 <h1 align="center">
-  👧🏻 小心 — 情感沟通助手
+  🐱 Warmth — 情感沟通助手
 </h1>
 
 <p align="center">
@@ -20,7 +20,7 @@
 每个人都会遇到说不清、想不通、放不下的感情困扰。  
 朋友可能没空听，家人可能不理解，心理咨询又太贵。
 
-小心是一个**随时在线**的倾听者——温暖但不说教，专业但不冰冷，隐私完全由你掌控。
+Warmth 是一个**随时在线**的倾听者——温暖但不说教，专业但不冰冷，隐私完全由你掌控。
 
 ---
 
@@ -111,10 +111,16 @@ emotional-agent/
 ├── index.html              ← 主程序（单文件，CSS/JS 全部内联）
 ├── main.js                 ← Electron 主进程
 ├── package.json            ← Electron 依赖与打包配置
+├── icon.ico                ← 应用图标（多尺寸）
+├── icon.png                ← 应用图标 PNG
 ├── README.md               ← 本文件
 ├── CLAUDE.md               ← AI 辅助开发说明
 ├── .npmrc                  ← 国内 npm 镜像配置
 ├── .gitignore
+├── assets/
+│   └── icon.svg            ← 图标 SVG 源文件
+├── scripts/
+│   └── generate_icon.py    ← 图标生成脚本
 ├── .github/workflows/
 │   └── pages.yml           ← GitHub Actions Pages 自动部署
 ├── docs/superpowers/
@@ -142,5 +148,5 @@ MIT © [nutshell319](https://github.com/nutshell319)
 ---
 
 <p align="center">
-  <sub>感到孤独的时候，记得有小暖在 💜</sub>
+  <sub>感到孤独的时候，记得有Warmth在 💜</sub>
 </p>
