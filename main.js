@@ -9,7 +9,7 @@ function createWindow() {
     height: 750,
     minWidth: 380,
     minHeight: 600,
-    title: '小心',
+    title: 'Warmth',
     icon: path.join(__dirname, 'icon.ico'),
     webPreferences: {
       webSecurity: false,       // 允许跨域请求（百度OCR等）
