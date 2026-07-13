@@ -456,7 +456,6 @@ input, textarea {
   white-space: pre-wrap;
   word-break: break-word;
   position: relative;
-  overflow: visible;
 }
 .msg-row.user .msg-bubble {
   background: rgba(255,255,255,0.06);
@@ -499,23 +498,24 @@ input, textarea {
 }
 .msg-row.user .msg-time { text-align: right; }
 
-/* 复制按钮 — hover 时在气泡右上角浮现 */
+/* 复制按钮 — hover 时在时间戳旁浮现 */
 .msg-copy-btn {
-  position: absolute; top: 4px; right: 4px;
-  width: 24px; height: 24px;
-  border-radius: 6px;
-  background: rgba(0,0,0,0.5);
-  color: var(--text-dim);
-  font-size: 12px;
-  display: flex; align-items: center; justify-content: center;
+  display: inline-block;
+  margin-left: 6px;
+  padding: 0 6px;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 11px;
   cursor: pointer;
   opacity: 0;
   transition: opacity 0.2s, background 0.15s, color 0.15s;
-  z-index: 2;
+  vertical-align: middle;
 }
-.msg-row:hover .msg-copy-btn { opacity: 1; }
-.msg-copy-btn:hover { background: rgba(255,255,255,0.12); color: var(--text); }
-.msg-copy-btn.copied { background: var(--title); color: #fff; }
+.msg-row:hover .msg-copy-btn,
+.msg-row.agent.stagger-in:hover .msg-copy-btn { opacity: 1; }
+.msg-copy-btn:hover { background: rgba(255,255,255,0.08); color: var(--text); }
+.msg-copy-btn.copied { color: var(--title); opacity: 1 !important; }
 
 /* Reject card */
 .reject-card {
@@ -2536,18 +2536,13 @@ const UIController = {
     this._dom.chatMessages.addEventListener('click', (e) => {
       const btn = e.target.closest('.msg-copy-btn');
       if (!btn) return;
-      const bubble = btn.closest('.msg-bubble');
-      // 获取气泡文本（排除按钮自身的文字）
-      const text = Array.from(bubble.childNodes)
-        .filter(n => n !== btn && n.nodeType === Node.TEXT_NODE)
-        .map(n => n.textContent).join('').trim()
-        || bubble.textContent.replace('📋', '').trim();
+      const text = btn.getAttribute('data-text') || '';
+      if (!text) return;
       navigator.clipboard.writeText(text).then(() => {
         btn.textContent = '✓';
         btn.classList.add('copied');
         setTimeout(() => { btn.textContent = '📋'; btn.classList.remove('copied'); }, 1200);
       }).catch(() => {
-        // fallback for non-HTTPS
         const ta = document.createElement('textarea');
         ta.value = text;
         ta.style.position = 'fixed'; ta.style.left = '-9999px';
@@ -3118,8 +3113,8 @@ const UIController = {
     row.innerHTML = `
       <div class="msg-avatar">👤</div>
       <div class="msg-content">
-        <div class="msg-bubble">${content}<button class="msg-copy-btn" title="复制">📋</button></div>
-        <div class="msg-time">${this._formatTime(msg.timestamp)}</div>
+        <div class="msg-bubble">${content}</div>
+        <div class="msg-time">${this._formatTime(msg.timestamp)}<button class="msg-copy-btn" title="复制" data-text="${this._escapeHtml(msg.content).replace(/"/g, '&quot;')}">📋</button></div>
       </div>`;
     return row;
   },
@@ -3130,8 +3125,8 @@ const UIController = {
     row.innerHTML = `
       <div class="msg-avatar">👧🏻</div>
       <div class="msg-content">
-        <div class="msg-bubble">${this._escapeHtml(this._stripMarkdown(msg.content))}<button class="msg-copy-btn" title="复制">📋</button></div>
-        ${showAvatar ? '<div class="msg-time">' + this._formatTime(msg.timestamp) + '</div>' : ''}
+        <div class="msg-bubble">${this._escapeHtml(this._stripMarkdown(msg.content))}</div>
+        ${showAvatar ? '<div class="msg-time">' + this._formatTime(msg.timestamp) + '<button class="msg-copy-btn" title="复制" data-text="' + this._escapeHtml(msg.content).replace(/"/g, '&quot;') + '">📋</button></div>' : ''}
         ${wasInterrupted ? '<span class="continue-hint" data-action="continue">点击继续生成 →</span>' : ''}
       </div>`;
 
@@ -3150,8 +3145,8 @@ const UIController = {
     row.innerHTML = `
       <div class="msg-avatar">👧🏻</div>
       <div class="msg-content">
-        <div class="msg-bubble"><button class="msg-copy-btn" title="复制">📋</button></div>
-        ${isLast ? '<div class="msg-time">' + this._formatTime(now) + '</div>' : ''}
+        <div class="msg-bubble"></div>
+        ${isLast ? '<div class="msg-time">' + this._formatTime(now) + '<button class="msg-copy-btn" title="复制" data-text="">📋</button></div>' : ''}
       </div>`;
     return row;
   },
@@ -3319,6 +3314,15 @@ const UIController = {
           }
 
           prevRow = row;
+        }
+
+        // 最后一段的复制按钮填充完整文本
+        if (prevRow && segments.length > 0) {
+          const copyBtn = prevRow.querySelector('.msg-copy-btn');
+          if (copyBtn) {
+            const fullText = segments.join('\n\n');
+            copyBtn.setAttribute('data-text', fullText);
+          }
         }
 
         // 全部完成，恢复输入
