@@ -660,6 +660,21 @@ input, textarea {
 }
 .settings-input:focus { border-color: var(--title); }
 .settings-input::placeholder { color: var(--text-muted); }
+.input-with-icon { position: relative; display: flex; }
+.input-with-icon .settings-input { flex: 1; padding-right: 38px; }
+.toggle-pw {
+  position: absolute; right: 4px; top: 50%; transform: translateY(-50%);
+  width: 30px; height: 30px;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 15px;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  transition: color 0.15s, background 0.15s;
+}
+.toggle-pw:hover { color: var(--text); background: rgba(255,255,255,0.06); }
+.toggle-pw.active { color: var(--title); }
 
 .settings-select {
   padding: 8px 12px;
@@ -3427,6 +3442,18 @@ const UIController = {
       el.addEventListener('input', () => {
         SettingsManager.set(key, el.value);
         this._updateApiStatus();
+      });
+    });
+
+    // 密码可见性切换
+    document.querySelectorAll('.toggle-pw').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const input = document.getElementById(btn.dataset.target);
+        if (!input) return;
+        const show = input.type === 'password';
+        input.type = show ? 'text' : 'password';
+        btn.classList.toggle('active', show);
+        btn.textContent = show ? '🙈' : '👁';
       });
     });
 
