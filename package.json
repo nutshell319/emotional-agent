@@ -5,15 +5,20 @@
   "main": "main.js",
   "scripts": {
     "start": "electron .",
-    "build": "electron-builder --win portable",
+    "build": "electron-builder --win nsis",
     "build:portable": "node scripts/make-portable.js"
   },
   "build": {
     "appId": "com.warmth.emotional-agent",
     "productName": "Warmth",
     "win": {
-      "target": "portable",
+      "target": "nsis",
       "icon": "icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "installerIcon": "icon.ico"
     }
   },
   "devDependencies": {
