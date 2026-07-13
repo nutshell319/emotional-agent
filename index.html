@@ -1139,10 +1139,13 @@ input, textarea {
 
       <div class="settings-group">
         <label>模型</label>
-        <select class="settings-select" id="settingModel">
-          <option value="deepseek-v4-pro">DeepSeek V4 Pro</option>
-          <option value="deepseek-v4-flash">DeepSeek V4 Flash</option>
-        </select>
+        <div class="custom-select settings-custom-select" id="settingModel" data-value="deepseek-v4-flash">
+          <div class="custom-select-trigger">DeepSeek V4 Flash</div>
+          <div class="custom-select-panel">
+            <div class="custom-select-option" data-value="deepseek-v4-pro">DeepSeek V4 Pro</div>
+            <div class="custom-select-option selected" data-value="deepseek-v4-flash">DeepSeek V4 Flash</div>
+          </div>
+        </div>
       </div>
 
       <div class="settings-group">
@@ -2439,6 +2442,7 @@ const UIController = {
 
     this._bindEvents();
     this._bindSettingsEvents();
+    this._initCustomSelects(this._dom.settingsPanel);
     this._loadSettingsToForm();
     this._renderUserProfileCard();  // 用户画像全局持久，只渲染一次
     this._renderSidebar();
@@ -3433,9 +3437,15 @@ const UIController = {
       this._updateApiStatus();
     });
 
-    document.getElementById('settingModel').addEventListener('change', (e) => {
-      SettingsManager.set('model', e.target.value);
-      this._updateApiStatus();
+    // 模型选择（自定义下拉）— 选项点击时保存
+    document.querySelector('#settingModel .custom-select-panel').addEventListener('click', (e) => {
+      const opt = e.target.closest('.custom-select-option');
+      if (!opt) return;
+      const val = opt.getAttribute('data-value');
+      if (val) {
+        SettingsManager.set('model', val);
+        this._updateApiStatus();
+      }
     });
 
     // 助手昵称
@@ -3451,7 +3461,14 @@ const UIController = {
     document.getElementById('settingAgentName').value = s.agentName || 'Warmth';
     document.getElementById('settingApiKey').value = s.apiKey || '';
     document.getElementById('settingBaseURL').value = s.baseURL || '';
-    document.getElementById('settingModel').value = s.model || 'deepseek-v4-flash';
+    // 更新自定义下拉的显示
+    const modelCs = document.getElementById('settingModel');
+    const model = s.model || 'deepseek-v4-flash';
+    modelCs.setAttribute('data-value', model);
+    const modelOpts = modelCs.querySelectorAll('.custom-select-option');
+    modelOpts.forEach(o => o.classList.toggle('selected', o.getAttribute('data-value') === model));
+    const modelLabel = { 'deepseek-v4-pro': 'DeepSeek V4 Pro', 'deepseek-v4-flash': 'DeepSeek V4 Flash' };
+    modelCs.querySelector('.custom-select-trigger').textContent = modelLabel[model] || model;
     document.getElementById('settingTemperature').value = s.temperature ?? 0.7;
     document.getElementById('settingBaiduOcrApiKey').value = s.baiduOcrApiKey || '';
     document.getElementById('settingBaiduOcrSecretKey').value = s.baiduOcrSecretKey || '';
