@@ -837,31 +837,58 @@ input, textarea {
   font-family: inherit;
 }
 .profile-modal .pf-input:focus { border-color: var(--title); outline: none; }
-.profile-modal select.pf-input {
+/* 自定义下拉选择器 */
+.custom-select {
+  position: relative;
+  user-select: none;
+}
+.custom-select-trigger {
+  padding: 8px 28px 8px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(255,255,255,0.1);
+  background: rgba(255,255,255,0.04);
   color: var(--text);
-  background: rgba(255,255,255,0.06);
+  font-size: 14px;
   cursor: pointer;
-  appearance: none;
-  border-radius: 12px;
-  padding-right: 32px;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M2 4l4 4 4-4' fill='none' stroke='%23aaa59a' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right 10px center;
-  transition: border-color 0.25s ease, background 0.25s ease, box-shadow 0.25s ease;
+  position: relative;
+  transition: border-color 0.2s;
 }
-.profile-modal select.pf-input:hover {
-  background: rgba(255,255,255,0.08);
-  border-color: rgba(255,255,255,0.2);
+.custom-select-trigger::after {
+  content: '▾';
+  position: absolute; right: 10px; top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-dim);
+  font-size: 11px;
+  transition: transform 0.2s;
 }
-.profile-modal select.pf-input:focus {
-  border-color: var(--title);
-  box-shadow: 0 0 0 3px rgba(185,142,255,0.12);
-  outline: none;
-}
-.profile-modal select.pf-input option {
-  color: var(--text);
+.custom-select.open .custom-select-trigger { border-color: var(--title); }
+.custom-select.open .custom-select-trigger::after { transform: translateY(-50%) rotate(180deg); }
+.custom-select-panel {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0; right: 0;
   background: #111118;
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 10px;
+  overflow: hidden;
+  z-index: 10;
+  display: none;
+  animation: dropdownIn 0.2s ease;
 }
+.custom-select.open .custom-select-panel { display: block; }
+@keyframes dropdownIn {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.custom-select-option {
+  padding: 8px 12px;
+  font-size: 14px;
+  color: var(--text);
+  cursor: pointer;
+  transition: background 0.12s;
+}
+.custom-select-option:hover { background: rgba(255,255,255,0.06); }
+.custom-select-option.selected { color: var(--title); }
 .profile-modal .pf-textarea {
   resize: vertical; min-height: 50px;
 }
@@ -2737,12 +2764,15 @@ const UIController = {
         </div>
         <div class="settings-group">
           <label>性别</label>
-          <select class="pf-input" id="upfGender">
-            <option value="">不填</option>
-            <option value="男" ${memory.gender === '男' ? 'selected' : ''}>男</option>
-            <option value="女" ${memory.gender === '女' ? 'selected' : ''}>女</option>
-            <option value="其他" ${memory.gender === '其他' ? 'selected' : ''}>其他</option>
-          </select>
+          <div class="custom-select" id="upfGender" data-value="${memory.gender || ''}">
+            <div class="custom-select-trigger">${memory.gender || '不填'}</div>
+            <div class="custom-select-panel">
+              <div class="custom-select-option${!memory.gender ? ' selected' : ''}" data-value="">不填</div>
+              <div class="custom-select-option${memory.gender === '男' ? ' selected' : ''}" data-value="男">男</div>
+              <div class="custom-select-option${memory.gender === '女' ? ' selected' : ''}" data-value="女">女</div>
+              <div class="custom-select-option${memory.gender === '其他' ? ' selected' : ''}" data-value="其他">其他</div>
+            </div>
+          </div>
         </div>
         <div class="settings-group">
           <label>MBTI</label>
@@ -2772,6 +2802,7 @@ const UIController = {
       </div>`;
 
     document.body.appendChild(overlay);
+    this._initCustomSelects(overlay);
 
     const close = () => overlay.remove();
     overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
@@ -2810,7 +2841,7 @@ const UIController = {
     document.getElementById('upfSave').addEventListener('click', () => {
       const data = {
         name: document.getElementById('upfName').value.trim(),
-        gender: document.getElementById('upfGender').value,
+        gender: document.getElementById('upfGender').getAttribute('data-value'),
         mbti: document.getElementById('upfMbti').value.trim(),
         zodiac: document.getElementById('upfZodiac').value.trim(),
         age: document.getElementById('upfAge').value.trim(),
@@ -2888,12 +2919,15 @@ const UIController = {
         </div>
         <div class="settings-group">
           <label>性别</label>
-          <select class="pf-input" id="pfGender">
-            <option value="">不填</option>
-            <option value="男" ${profile.gender === '男' ? 'selected' : ''}>男</option>
-            <option value="女" ${profile.gender === '女' ? 'selected' : ''}>女</option>
-            <option value="其他" ${profile.gender === '其他' ? 'selected' : ''}>其他</option>
-          </select>
+          <div class="custom-select" id="pfGender" data-value="${profile.gender || ''}">
+            <div class="custom-select-trigger">${profile.gender || '不填'}</div>
+            <div class="custom-select-panel">
+              <div class="custom-select-option${!profile.gender ? ' selected' : ''}" data-value="">不填</div>
+              <div class="custom-select-option${profile.gender === '男' ? ' selected' : ''}" data-value="男">男</div>
+              <div class="custom-select-option${profile.gender === '女' ? ' selected' : ''}" data-value="女">女</div>
+              <div class="custom-select-option${profile.gender === '其他' ? ' selected' : ''}" data-value="其他">其他</div>
+            </div>
+          </div>
         </div>
         <div class="settings-group">
           <label>MBTI</label>
@@ -2926,6 +2960,7 @@ const UIController = {
       </div>`;
 
     document.body.appendChild(overlay);
+    this._initCustomSelects(overlay);
 
     const close = () => overlay.remove();
     overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
@@ -2933,7 +2968,7 @@ const UIController = {
     document.getElementById('pfSave').addEventListener('click', () => {
       const data = {
         name: document.getElementById('pfName').value.trim(),
-        gender: document.getElementById('pfGender').value,
+        gender: document.getElementById('pfGender').getAttribute('data-value'),
         mbti: document.getElementById('pfMbti').value.trim(),
         zodiac: document.getElementById('pfZodiac').value.trim(),
         age: document.getElementById('pfAge').value.trim(),
@@ -3273,6 +3308,49 @@ const UIController = {
       this._dom.btnSend.disabled = false;
       this._showToast(err.userMessage || err.message, 'error');
     });
+  },
+
+  _initCustomSelects(container) {
+    container.querySelectorAll('.custom-select').forEach(cs => {
+      const trigger = cs.querySelector('.custom-select-trigger');
+      const panel = cs.querySelector('.custom-select-panel');
+      const options = cs.querySelectorAll('.custom-select-option');
+
+      trigger.addEventListener('click', (e) => {
+        e.stopPropagation();
+        // 关闭其他打开的 custom-select
+        container.querySelectorAll('.custom-select.open').forEach(s => {
+          if (s !== cs) s.classList.remove('open');
+        });
+        cs.classList.toggle('open');
+      });
+
+      options.forEach(opt => {
+        opt.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const val = opt.getAttribute('data-value');
+          cs.setAttribute('data-value', val);
+          trigger.textContent = val || '不填';
+          options.forEach(o => o.classList.remove('selected'));
+          opt.classList.add('selected');
+          cs.classList.remove('open');
+        });
+      });
+    });
+
+    // 点击空白处关闭所有下拉
+    const closeHandler = (e) => {
+      if (!container.contains(e.target)) {
+        container.querySelectorAll('.custom-select.open').forEach(s => s.classList.remove('open'));
+      }
+    };
+    document.addEventListener('click', closeHandler);
+    // 弹窗关闭时清理监听器
+    const cleanup = () => {
+      document.removeEventListener('click', closeHandler);
+      container.removeEventListener('DOMNodeRemoved', cleanup);
+    };
+    container.addEventListener('DOMNodeRemoved', cleanup);
   },
 
   _scrollToBottom() {
