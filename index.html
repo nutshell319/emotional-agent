@@ -1106,10 +1106,6 @@ input, textarea {
         <select class="settings-select" id="settingModel">
           <option value="deepseek-v4-pro">DeepSeek V4 Pro</option>
           <option value="deepseek-v4-flash">DeepSeek V4 Flash</option>
-          <option value="deepseek-chat">DeepSeek V3</option>
-          <option value="deepseek-reasoner">DeepSeek R1</option>
-          <option value="doubao-lite-128k">豆包 Lite (128K)</option>
-          <option value="doubao-pro-128k">豆包 Pro (128K)</option>
         </select>
       </div>
 
@@ -2960,7 +2956,7 @@ const UIController = {
       <div class="msg-avatar">👧🏻</div>
       <div class="msg-content">
         <div class="msg-bubble">${this._escapeHtml(this._stripMarkdown(msg.content))}</div>
-        ${isConsecutive ? '' : '<div class="msg-time">' + this._formatTime(msg.timestamp) + '</div>'}
+        ${showAvatar ? '<div class="msg-time">' + this._formatTime(msg.timestamp) + '</div>' : ''}
         ${wasInterrupted ? '<span class="continue-hint" data-action="continue">点击继续生成 →</span>' : ''}
       </div>`;
 
@@ -2980,7 +2976,7 @@ const UIController = {
       <div class="msg-avatar">👧🏻</div>
       <div class="msg-content">
         <div class="msg-bubble"></div>
-        ${isFirst ? '<div class="msg-time">' + this._formatTime(now) + '</div>' : ''}
+        ${isLast ? '<div class="msg-time">' + this._formatTime(now) + '</div>' : ''}
       </div>`;
     return row;
   },
