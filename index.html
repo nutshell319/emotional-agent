@@ -550,43 +550,24 @@ input, textarea {
   flex: none; max-width: none; width: auto;
 }
 #typingIndicator .msg-bubble {
-  display: inline-flex; align-items: center; gap: 4px;
-  padding: 5px 10px;
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 8px 14px;
   border-radius: 14px;
   background: rgba(255,255,255,0.03);
   border: 1px solid rgba(255,255,255,0.05);
-  backdrop-filter: none; -webkit-backdrop-filter: none;
-  font-size: 11px; color: var(--text-dim);
-}
-#typingIndicator .msg-bubble > * {
-  display: contents;
-}
-#typingIndicator .thinking-label {
-  font-size: 11px;
-  color: var(--text-dim);
-  background: linear-gradient(90deg, var(--text-dim) 0%, var(--title) 50%, var(--text-dim) 100%);
-  background-size: 200% 100%;
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-  animation: shimmer 2s ease-in-out infinite;
-}
-@keyframes shimmer {
-  0% { background-position: 200% 0; }
-  100% { background-position: -200% 0; }
 }
 #typingIndicator .thinking-dot {
   display: inline-block;
-  width: 3px; height: 3px;
+  width: 6px; height: 6px;
   border-radius: 50%;
   background: var(--title);
-  animation: thinkingBounce 1.2s infinite ease-in-out;
+  animation: thinkingWave 1.4s infinite ease-in-out;
 }
 #typingIndicator .thinking-dot:nth-child(2) { animation-delay: 0.2s; }
 #typingIndicator .thinking-dot:nth-child(3) { animation-delay: 0.4s; }
-@keyframes thinkingBounce {
-  0%, 60%, 100% { transform: translateY(0); opacity: 0.3; }
-  30% { transform: translateY(-6px); opacity: 1; }
+@keyframes thinkingWave {
+  0%, 60%, 100% { transform: translateY(0) scale(0.6); opacity: 0.3; }
+  30% { transform: translateY(-8px) scale(1.15); opacity: 1; }
 }
 
 /* 思考时头像微动 */
@@ -3099,7 +3080,6 @@ const UIController = {
       <div class="msg-avatar">👧🏻</div>
       <div class="msg-content">
         <div class="msg-bubble">
-          <span class="thinking-label">${this._escapeHtml(name)}正在思考</span>
           <span class="thinking-dot"></span>
           <span class="thinking-dot"></span>
           <span class="thinking-dot"></span>
