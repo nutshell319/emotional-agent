@@ -3,15 +3,49 @@
 </h1>
 
 <p align="center">
+  <img src="https://img.shields.io/badge/version-2.0.0-f5b878" alt="Version">
+  <img src="https://img.shields.io/badge/platform-Windows-blue" alt="Platform">
   <img src="https://img.shields.io/badge/status-active-brightgreen" alt="Status">
   <img src="https://img.shields.io/github/license/nutshell319/emotional-agent" alt="License">
-  <img src="https://img.shields.io/badge/PRs-welcome-purple" alt="PRs">
 </p>
 
 <p align="center">
-  一个基于 LLM 的情感沟通对话助手。<br>
-  倾听你的困扰，理解你的情绪，陪你一起找到答案。
+  <strong>基于 DeepSeek LLM 的情感沟通对话助手</strong><br>
+  暖橘像素猫 · 倾听不评判 · 隐私全本地 · Windows 桌面应用
 </p>
+
+<p align="center">
+  <a href="https://github.com/nutshell319/emotional-agent/releases/latest"><strong>⬇️ 下载安装包</strong></a>
+  &nbsp;·&nbsp;
+  <a href="https://nutshell319.github.io/emotional-agent/">🌐 在线版</a>
+  &nbsp;·&nbsp;
+  <a href="#-快速开始">快速开始</a>
+  &nbsp;·&nbsp;
+  <a href="#-功能特性">功能特性</a>
+</p>
+
+---
+
+## 📥 下载安装
+
+> **v2.0.0** — 首个正式发布版本
+
+| 平台 | 下载 | 说明 |
+|------|------|------|
+| 🪟 **Windows** | [**Warmth Setup 2.0.0.exe**](https://github.com/nutshell319/emotional-agent/releases/latest) | NSIS 安装包，可选安装路径，自动创建快捷方式 |
+| 🌐 **在线版** | [nutshell319.github.io/emotional-agent](https://nutshell319.github.io/emotional-agent/) | 浏览器直接打开，无需安装 |
+
+> 💡 Windows 安装包约 73MB，双击运行，支持自定义安装目录。安装后在开始菜单和桌面均可找到快捷方式。
+
+### 自己构建
+
+```bash
+git clone https://github.com/nutshell319/emotional-agent.git
+cd emotional-agent
+npm install
+npm run build        # 以管理员身份运行（Windows 需要）
+# 输出: dist/Warmth Setup 2.0.0.exe
+```
 
 ---
 
@@ -46,35 +80,30 @@ Warmth 是一个**随时在线**的倾听者——温暖但不说教，专业但
 
 ## 🚀 快速开始
 
-### 在线使用
+### 方式一：下载安装包（推荐）
 
-👉 **[nutshell319.github.io/emotional-agent](https://nutshell319.github.io/emotional-agent/)**
+👉 **[最新 Release](https://github.com/nutshell319/emotional-agent/releases/latest)** → 下载 `Warmth Setup 2.0.0.exe` → 双击安装
 
-打开即用，无需安装。
+### 方式二：在线使用
 
-### 本地运行
+👉 **[在线版](https://nutshell319.github.io/emotional-agent/)** — 浏览器打开即用
+
+### 方式三：本地运行
 
 ```bash
 git clone https://github.com/nutshell319/emotional-agent.git
 cd emotional-agent
-# 双击 index.html 即可，或用浏览器打开
-open index.html
-```
-
-### 桌面应用（Electron）
-
-```bash
+# 浏览器打开 index.html 即可
+# 或使用 Electron 桌面版：
 npm install
 npm start
 ```
 
-桌面版自动绕过 CORS 限制，无需额外配置代理。
-
 ### 配置 API
 
 1. 点击右上角 ⚙ 或按 `Ctrl+,` 打开设置
-2. 填入 DeepSeek API Key（[获取地址](https://platform.deepseek.com/api_keys)）
-3. 默认模型 `deepseek-v4-flash`，支持切换豆包/GPT 等兼容 API
+2. 填入 [DeepSeek API Key](https://platform.deepseek.com/api_keys)
+3. 默认模型 `deepseek-v4-flash`，支持切换到其他兼容 API
 
 ---
 
@@ -108,25 +137,24 @@ npm start
 
 ```
 emotional-agent/
-├── index.html              ← 主程序（单文件，CSS/JS 全部内联）
-├── main.js                 ← Electron 主进程
-├── package.json            ← Electron 依赖与打包配置
-├── icon.ico                ← 应用图标（多尺寸）
-├── icon.png                ← 应用图标 PNG
+├── index.html              ← 主程序（单文件 ~3400 行，CSS/JS 全部内联）
+├── main.js                 ← Electron 主进程（960×600 横屏窗口）
+├── package.json            ← Electron 28 + electron-builder 打包配置
+├── icon.ico                ← 应用图标（🐱 emoji 像素化，7 尺寸）
+├── icon-src-32.png         ← 图标 32×32 源文件
+├── icon-preview.png        ← 图标 256×256 预览
 ├── README.md               ← 本文件
 ├── CLAUDE.md               ← AI 辅助开发说明
 ├── .npmrc                  ← 国内 npm 镜像配置
 ├── .gitignore
 ├── assets/
-│   └── icon.svg            ← 图标 SVG 源文件
+│   └── icon.svg            ← 原始图标 SVG（v1 设计稿）
 ├── scripts/
-│   └── generate_icon.py    ← 图标生成脚本
+│   ├── make-portable.js    ← 便携版构建脚本
+│   └── vision.js           ← 千问 VL 识图脚本
 ├── .github/workflows/
 │   └── pages.yml           ← GitHub Actions Pages 自动部署
-├── docs/superpowers/
-│   ├── specs/               ← 设计规格
-│   └── plans/               ← 实施计划
-└── 2026-06-30-emotional-agent-design.md  ← 原始设计文档
+└── docs/superpowers/        ← 设计规格与实施计划
 ```
 
 ---
