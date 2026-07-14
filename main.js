@@ -5,10 +5,11 @@ let mainWindow = null;
 
 function createWindow() {
   mainWindow = new BrowserWindow({
-    width: 420,
-    height: 750,
-    minWidth: 380,
-    minHeight: 600,
+    width: 450,
+    height: 800,
+    minWidth: 360,
+    minHeight: 640,
+    // 9:16 纵横比，手机竖屏比例，适合聊天界面
     title: 'Warmth',
     icon: path.join(__dirname, 'icon.ico'),
     webPreferences: {
