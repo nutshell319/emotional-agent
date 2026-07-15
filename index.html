@@ -17,18 +17,29 @@
   --text: #f6f2e8;
   --text-dim: #aaa59a;
   --text-muted: #746f66;
-  --card-bg: rgba(255,255,255,0.03);
-  --card-border: rgba(255,255,255,0.06);
+  --card-bg: var(--fill-subtle);
+  --card-border: var(--fill-medium);
   --font: "Microsoft YaHei", "PingFang SC", system-ui, sans-serif;
   --sidebar-width: 260px;
   --settings-width: 340px;
   --persona-color: #b98eff;
   --persona-glow: rgba(185,142,255,0.15);
   --persona-gradient: linear-gradient(135deg, #d4a0ff, #f28b9f);
-  --msg-user-bg: rgba(255,255,255,0.06);
-  --msg-agent-bg: rgba(255,255,255,0.04);
+  --msg-user-bg: var(--fill-medium);
+  --msg-agent-bg: var(--fill-light);
   --sidebar-bg: rgba(255,255,255,0.015);
   --scrim: rgba(0,0,0,0.5);
+  --fill-dim: var(--fill-dim);
+  --fill-subtle: var(--fill-subtle);
+  --fill-light: var(--fill-light);
+  --fill-medium: var(--fill-medium);
+  --fill-strong: var(--fill-strong);
+  --border-subtle: var(--border-subtle);
+  --border-light: var(--fill-medium);
+  --border-medium: var(--border-medium);
+  --border-strong: var(--border-strong);
+  --hover-bg: var(--fill-medium);
+  --dot-grid: var(--fill-subtle);
 }
 
 /* 浅色主题 */
@@ -44,6 +55,17 @@
   --sidebar-bg: rgba(0,0,0,0.02);
   --scrim: rgba(0,0,0,0.3);
   --persona-glow: rgba(185,142,255,0.08);
+  --fill-dim: rgba(0,0,0,0.02);
+  --fill-subtle: rgba(0,0,0,0.03);
+  --fill-light: rgba(0,0,0,0.04);
+  --fill-medium: rgba(0,0,0,0.06);
+  --fill-strong: rgba(0,0,0,0.08);
+  --border-subtle: rgba(0,0,0,0.05);
+  --border-light: rgba(0,0,0,0.07);
+  --border-medium: rgba(0,0,0,0.08);
+  --border-strong: rgba(0,0,0,0.12);
+  --hover-bg: rgba(0,0,0,0.06);
+  --dot-grid: rgba(0,0,0,0.03);
 }
 
 /* 人格配色切换 */
@@ -82,8 +104,8 @@ body::before {
   pointer-events: none;
   z-index: 0;
   background-image:
-    repeating-linear-gradient(0deg, transparent, transparent 49px, rgba(255,255,255,0.03) 50px),
-    repeating-linear-gradient(90deg, transparent, transparent 49px, rgba(255,255,255,0.03) 50px);
+    repeating-linear-gradient(0deg, transparent, transparent 49px, var(--fill-subtle) 50px),
+    repeating-linear-gradient(90deg, transparent, transparent 49px, var(--fill-subtle) 50px);
 }
 
 /* ========================================
@@ -101,7 +123,7 @@ body::before {
    ======================================== */
 ::-webkit-scrollbar { width: 4px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 2px; }
+::-webkit-scrollbar-thumb { background: var(--fill-strong); border-radius: 2px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--persona-color); opacity: 0.5; }
 
 /* ========================================
@@ -203,7 +225,7 @@ input, textarea {
   position: relative;
   margin-bottom: 2px;
 }
-.chat-item:hover { background: rgba(255,255,255,0.04); }
+.chat-item:hover { background: var(--fill-light); }
 .chat-item.active { background: rgba(185,142,255,0.08); color: var(--text); }
 .chat-item .chat-icon { font-size: 14px; flex-shrink: 0; opacity: 0.6; }
 .chat-item .chat-title { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -230,7 +252,7 @@ input, textarea {
 .chat-item .chat-delete:hover { background: rgba(232,93,117,0.15); color: var(--accent); }
 .chat-item .chat-rename-input {
   flex: 1;
-  background: rgba(255,255,255,0.06);
+  background: var(--fill-medium);
   border: 1px solid var(--title);
   border-radius: 4px;
   color: var(--text);
@@ -299,9 +321,9 @@ input, textarea {
   width: calc(100% - 40px);
   margin: 0;
   border-top: none;
-  border: 1px solid rgba(255,255,255,0.08);
+  border: 1px solid var(--fill-strong);
   border-radius: 14px;
-  background: rgba(255,255,255,0.02);
+  background: var(--fill-dim);
 }
 
 .chat-header-bar {
@@ -321,7 +343,7 @@ input, textarea {
   display: flex; align-items: center; justify-content: center;
   transition: all 0.15s;
 }
-.icon-btn:hover { background: rgba(255,255,255,0.06); color: var(--text); }
+.icon-btn:hover { background: var(--fill-medium); color: var(--text); }
 
 /* Profile hint bar */
 .profile-hint-bar {
@@ -424,8 +446,8 @@ input, textarea {
   flex: 1;
   padding: 10px 16px;
   border-radius: 20px;
-  border: 1px solid rgba(255,255,255,0.1);
-  background: rgba(255,255,255,0.04);
+  border: 1px solid var(--border-strong);
+  background: var(--fill-light);
   color: var(--text);
   font-size: 14px;
   resize: none;
@@ -456,13 +478,13 @@ input, textarea {
   width: 40px; height: 40px;
   min-width: 40px;
   border-radius: 50%;
-  background: rgba(255,255,255,0.06);
+  background: var(--fill-medium);
   color: var(--text-dim);
   font-size: 18px;
   display: flex; align-items: center; justify-content: center;
   transition: background 0.25s ease, color 0.25s ease, transform 0.25s ease;
 }
-.img-btn:hover { background: rgba(255,255,255,0.1); color: var(--text); transform: scale(1.05); }
+.img-btn:hover { background: var(--border-strong); color: var(--text); transform: scale(1.05); }
 .img-btn.has-image { background: rgba(185,142,255,0.15); color: var(--title); }
 
 /* 图片预览区域（输入框上方） */
@@ -561,7 +583,7 @@ input, textarea {
   background: var(--msg-user-bg);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255,255,255,0.1);
+  border: 1px solid var(--border-strong);
   border-radius: 14px;
   color: var(--text);
 }
@@ -569,14 +591,14 @@ input, textarea {
   background: var(--msg-agent-bg);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255,255,255,0.07);
+  border: 1px solid var(--border-medium);
   border-left: 2px solid var(--persona-color);
   border-radius: 14px;
   color: var(--text);
   transition: border-color 0.2s;
 }
 .msg-row.agent .msg-bubble:hover {
-  border-color: rgba(255,255,255,0.12);
+  border-color: var(--border-strong);
 }
 
 /* streaming 光标 */
@@ -619,7 +641,7 @@ input, textarea {
 }
 .msg-row:hover .msg-copy-btn,
 .msg-row.agent.stagger-in:hover .msg-copy-btn { opacity: 1; }
-.msg-copy-btn:hover { background: rgba(255,255,255,0.08); color: var(--text); }
+.msg-copy-btn:hover { background: var(--fill-strong); color: var(--text); }
 .msg-copy-btn.copied { color: var(--title); opacity: 1 !important; }
 
 /* Reject card */
@@ -700,8 +722,8 @@ input, textarea {
   display: inline-flex; align-items: center; gap: 6px;
   padding: 8px 14px;
   border-radius: 14px;
-  background: rgba(255,255,255,0.03);
-  border: 1px solid rgba(255,255,255,0.05);
+  background: var(--fill-subtle);
+  border: 1px solid var(--border-subtle);
 }
 #typingIndicator .thinking-dot {
   display: inline-block;
@@ -767,7 +789,7 @@ input, textarea {
   padding: 2px 8px;
   margin-top: 4px;
   border-radius: 4px;
-  background: rgba(255,255,255,0.04);
+  background: var(--fill-light);
   color: var(--text-muted);
   font-size: 11px;
   cursor: pointer;
@@ -813,7 +835,7 @@ input, textarea {
   font-size: 16px;
   display: flex; align-items: center; justify-content: center;
 }
-.close-btn:hover { background: rgba(255,255,255,0.06); }
+.close-btn:hover { background: var(--fill-medium); }
 
 .settings-body {
   flex: 1;
@@ -829,8 +851,8 @@ input, textarea {
 .settings-input {
   padding: 8px 12px;
   border-radius: 8px;
-  border: 1px solid rgba(255,255,255,0.1);
-  background: rgba(255,255,255,0.04);
+  border: 1px solid var(--border-strong);
+  background: var(--fill-light);
   color: var(--text);
   font-size: 14px;
   font-family: inherit;
@@ -850,14 +872,14 @@ input, textarea {
   cursor: pointer;
   transition: color 0.15s, background 0.15s;
 }
-.toggle-pw:hover { color: var(--text); background: rgba(255,255,255,0.06); }
+.toggle-pw:hover { color: var(--text); background: var(--fill-medium); }
 .toggle-pw.active { color: var(--title); }
 
 .settings-select {
   padding: 8px 12px;
   border-radius: 8px;
-  border: 1px solid rgba(255,255,255,0.1);
-  background: rgba(255,255,255,0.04);
+  border: 1px solid var(--border-strong);
+  background: var(--fill-light);
   color: var(--text);
   font-size: 14px;
   font-family: inherit;
@@ -952,7 +974,7 @@ input, textarea {
   padding: 1px 7px;
   border-radius: 4px;
   font-size: 10px;
-  background: rgba(255,255,255,0.04);
+  background: var(--fill-light);
   color: var(--text-dim);
 }
 .profile-card .pf-tag.mbti { color: #81c784; }
@@ -969,7 +991,7 @@ input, textarea {
   margin: 8px 8px 4px 8px;
   padding: 8px 12px;
   border-radius: 10px;
-  border: 1px dashed rgba(255,255,255,0.06);
+  border: 1px dashed var(--fill-medium);
   font-size: 11px; color: var(--text-muted);
   text-align: center; cursor: pointer;
   transition: all 0.15s;
@@ -1003,8 +1025,8 @@ input, textarea {
 .profile-modal .pf-input {
   padding: 8px 12px;
   border-radius: 8px;
-  border: 1px solid rgba(255,255,255,0.1);
-  background: rgba(255,255,255,0.04);
+  border: 1px solid var(--border-strong);
+  background: var(--fill-light);
   color: var(--text);
   font-size: 14px;
   font-family: inherit;
@@ -1018,8 +1040,8 @@ input, textarea {
 .custom-select-trigger {
   padding: 8px 28px 8px 12px;
   border-radius: 8px;
-  border: 1px solid rgba(255,255,255,0.1);
-  background: rgba(255,255,255,0.04);
+  border: 1px solid var(--border-strong);
+  background: var(--fill-light);
   color: var(--text);
   font-size: 14px;
   cursor: pointer;
@@ -1041,7 +1063,7 @@ input, textarea {
   top: calc(100% + 4px);
   left: 0; right: 0;
   background: #111118;
-  border: 1px solid rgba(255,255,255,0.1);
+  border: 1px solid var(--border-strong);
   border-radius: 10px;
   overflow: hidden;
   z-index: 10;
@@ -1060,7 +1082,7 @@ input, textarea {
   cursor: pointer;
   transition: background 0.12s;
 }
-.custom-select-option:hover { background: rgba(255,255,255,0.06); }
+.custom-select-option:hover { background: var(--fill-medium); }
 .custom-select-option.selected { color: var(--title); }
 .profile-modal .pf-textarea {
   resize: vertical; min-height: 50px;
@@ -1082,15 +1104,15 @@ input, textarea {
   margin: 0 8px 4px 8px;
   padding: 10px 12px;
   border-radius: 10px;
-  border: 1px solid rgba(255,255,255,0.08);
-  background: rgba(255,255,255,0.02);
+  border: 1px solid var(--fill-strong);
+  background: var(--fill-dim);
   cursor: pointer;
   transition: all 0.15s;
   animation: slideIn 0.25s ease;
 }
 .user-profile-card:hover {
-  border-color: rgba(255,255,255,0.15);
-  background: rgba(255,255,255,0.04);
+  border-color: var(--border-strong);
+  background: var(--fill-light);
 }
 .user-profile-card .pf-row {
   display: flex; align-items: center; gap: 10px;
@@ -1132,20 +1154,20 @@ input, textarea {
   margin: 0 8px 4px 8px;
   padding: 8px 12px;
   border-radius: 10px;
-  border: 1px dashed rgba(255,255,255,0.06);
+  border: 1px dashed var(--fill-medium);
   font-size: 11px; color: var(--text-muted);
   text-align: center; cursor: pointer;
   transition: all 0.15s;
   animation: slideIn 0.25s ease;
 }
 .user-profile-card-empty:hover {
-  border-color: rgba(255,255,255,0.15);
+  border-color: var(--border-strong);
   color: #ccc;
 }
 
 /* User memory facts list in modal */
 .user-facts-section {
-  border-top: 1px solid rgba(255,255,255,0.06);
+  border-top: 1px solid var(--fill-medium);
   padding-top: 12px;
 }
 .user-facts-section .facts-header {
@@ -1160,7 +1182,7 @@ input, textarea {
   font-size: 12px; color: var(--text-dim);
   transition: background 0.15s;
 }
-.user-facts-section .fact-item:hover { background: rgba(255,255,255,0.03); }
+.user-facts-section .fact-item:hover { background: var(--fill-subtle); }
 .user-facts-section .fact-item .fact-text {
   flex: 1;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
