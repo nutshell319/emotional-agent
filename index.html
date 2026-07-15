@@ -25,6 +25,25 @@
   --persona-color: #b98eff;
   --persona-glow: rgba(185,142,255,0.15);
   --persona-gradient: linear-gradient(135deg, #d4a0ff, #f28b9f);
+  --msg-user-bg: rgba(255,255,255,0.06);
+  --msg-agent-bg: rgba(255,255,255,0.04);
+  --sidebar-bg: rgba(255,255,255,0.015);
+  --scrim: rgba(0,0,0,0.5);
+}
+
+/* 浅色主题 */
+[data-theme="light"] {
+  --bg: #f8f6f2;
+  --text: #2d2a26;
+  --text-dim: #6b6560;
+  --text-muted: #9b9590;
+  --card-bg: rgba(0,0,0,0.03);
+  --card-border: rgba(0,0,0,0.08);
+  --msg-user-bg: rgba(0,0,0,0.04);
+  --msg-agent-bg: rgba(0,0,0,0.02);
+  --sidebar-bg: rgba(0,0,0,0.02);
+  --scrim: rgba(0,0,0,0.3);
+  --persona-glow: rgba(185,142,255,0.08);
 }
 
 /* 人格配色切换 */
@@ -137,7 +156,7 @@ input, textarea {
   width: var(--sidebar-width);
   min-width: var(--sidebar-width);
   height: 100%;
-  background: rgba(255,255,255,0.015);
+  background: var(--sidebar-bg);
   border-right: 1px solid var(--card-border);
   display: flex;
   flex-direction: column;
@@ -233,6 +252,19 @@ input, textarea {
   transition: all 0.15s;
 }
 .sidebar-footer-btn:hover { background: rgba(232,93,117,0.08); color: var(--accent); }
+.theme-toggle {
+  width: 100%;
+  padding: 8px;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-dim);
+  font-size: 16px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.15s;
+  margin-bottom: 6px;
+}
+.theme-toggle:hover { background: var(--card-bg); }
 
 /* ========================================
    Main Chat Area
@@ -525,7 +557,7 @@ input, textarea {
   position: relative;
 }
 .msg-row.user .msg-bubble {
-  background: rgba(255,255,255,0.06);
+  background: var(--msg-user-bg);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   border: 1px solid rgba(255,255,255,0.1);
@@ -533,7 +565,7 @@ input, textarea {
   color: var(--text);
 }
 .msg-row.agent .msg-bubble {
-  background: rgba(255,255,255,0.04);
+  background: var(--msg-agent-bg);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   border: 1px solid rgba(255,255,255,0.07);
@@ -707,6 +739,26 @@ input, textarea {
   transition: opacity 0.4s ease;
 }
 .thinking-text.show { opacity: 1; }
+
+/* 思考→回复过渡 */
+#typingIndicator.fading-out {
+  opacity: 0;
+  max-height: 0;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  transition: opacity 0.2s ease, max-height 0.25s ease 0.05s, margin 0.25s ease, padding 0.25s ease;
+}
+#typingIndicator .thinking-dot.got-it {
+  animation: thinkingGotIt 0.6s infinite ease-in-out;
+}
+#typingIndicator .thinking-dot.got-it:last-child {
+  background: #6eb5a0;
+}
+@keyframes thinkingGotIt {
+  0%, 100% { transform: translateY(0) scale(0.5); opacity: 0.4; }
+  50% { transform: translateY(-4px) scale(1.1); opacity: 1; }
+}
 
 /* "继续"按钮（中断补全） */
 .continue-hint {
@@ -1198,6 +1250,9 @@ input, textarea {
     <div class="profile-area" id="profileArea"></div>
     <div class="chat-list" id="chatList"></div>
     <div class="sidebar-footer">
+      <button class="theme-toggle" id="btnThemeToggle" title="切换主题">
+        <span class="theme-icon">🌙</span>
+      </button>
       <button class="sidebar-footer-btn" id="btnClearAll">清除全部对话</button>
     </div>
   </aside>
@@ -1449,6 +1504,7 @@ const SettingsManager = {
     temperature: 0.7,
     agentName: 'Warmth',
     persona: 'dushe',  // 当前选择的人格ID
+    theme: 'dark',     // 主题：dark | light
     ocrApiKey: '',
     baiduOcrApiKey: '',
     baiduOcrSecretKey: '',
@@ -3407,6 +3463,7 @@ const UIController = {
       imgPreviewWrap: document.getElementById('imgPreviewWrap'),
       btnSettings: document.getElementById('btnSettings'),
       btnClearAll: document.getElementById('btnClearAll'),
+      btnThemeToggle: document.getElementById('btnThemeToggle'),
       profileHintBar: document.getElementById('profileHintBar'),
       btnProfileHint: document.getElementById('btnProfileHint'),
       profileArea: document.getElementById('profileArea'),
@@ -3428,6 +3485,10 @@ const UIController = {
     this._renderSidebar();
     this._loadLastChat();
     this._checkFirstRun();
+
+    // 应用保存的主题
+    const savedTheme = SettingsManager.getAll().theme || 'dark';
+    this._applyTheme(savedTheme);
   },
 
   /* ---- 事件绑定 ---- */
@@ -3506,6 +3567,7 @@ const UIController = {
 
     this._dom.btnSettings.addEventListener('click', () => this._toggleSettings());
     this._dom.btnClearAll.addEventListener('click', () => this._clearAllChats());
+    this._dom.btnThemeToggle.addEventListener('click', () => this._toggleTheme());
     this._dom.btnProfileHint.addEventListener('click', () => this._openProfileModal());
     this._dom.profileHintBar.addEventListener('click', () => this._openProfileModal());
 
@@ -3606,6 +3668,21 @@ const UIController = {
   _closeContextMenu() {
     const existing = document.getElementById('contextMenu');
     if (existing) existing.remove();
+  },
+
+  /** 应用主题 */
+  _applyTheme(theme) {
+    document.documentElement.setAttribute('data-theme', theme);
+    const icon = document.querySelector('.theme-icon');
+    if (icon) icon.textContent = theme === 'dark' ? '🌙' : '☀️';
+  },
+
+  /** 切换深色/浅色主题 */
+  _toggleTheme() {
+    const current = document.documentElement.getAttribute('data-theme') || 'dark';
+    const next = current === 'dark' ? 'light' : 'dark';
+    this._applyTheme(next);
+    SettingsManager.set('theme', next);
   },
 
   /* ---- 侧边栏渲染 ---- */
@@ -4320,22 +4397,40 @@ const UIController = {
         this._dom.chatTitle.textContent = ChatManager.getCurrentChat()?.title || '新对话';
       },
       onAgentSegments: async (segments) => {
-        // 清除思考文案轮播定时器 + 移除思考动画
+        // 清除思考文案轮播定时器
         if (typing._thinkingTimer) { clearInterval(typing._thinkingTimer); typing._thinkingTimer = null; }
-        typing.remove();
 
-        // 回复前随机停顿（情绪感知：情绪越重、停顿越久），模拟真人思考时间
+        // 阶段1→2：思考动画过渡到"想到了"状态
+        const textEl = typing.querySelector('.thinking-text');
+        const dots = typing.querySelectorAll('.thinking-dot');
+        if (textEl) textEl.textContent = '想到了…';
+        dots.forEach(d => d.classList.add('got-it'));
+
+        // 回复前停顿（保持思考行可见——用户看到"正在想→想到了"的完整过程）
         const emotionState = EmotionTracker.getState(ChatManager.getCurrentChat());
         let preDelay;
         if (emotionState === 'sad' || emotionState === 'anxious') {
-          preDelay = 600 + Math.floor(Math.random() * 600);  // 600-1200ms，情绪消息需要更多思考
+          preDelay = 600 + Math.floor(Math.random() * 600);
         } else if (emotionState === 'angry') {
-          preDelay = 400 + Math.floor(Math.random() * 400);  // 400-800ms，稍快表达共鸣
+          preDelay = 400 + Math.floor(Math.random() * 400);
         } else {
-          preDelay = 300 + Math.floor(Math.random() * 600);  // 300-900ms，默认
+          preDelay = 300 + Math.floor(Math.random() * 600);
         }
         await this._sleep(preDelay);
         if (this._animId !== animId) return;
+
+        // 阶段2→3：思考行淡出 + 第一个气泡同时弹入
+        typing.classList.add('fading-out');
+
+        // 创建第一个气泡（stagger-in 动画与 fade-out 重叠）
+        const isFirstOnly = segments.length === 1;
+        const firstRow = this._createTypewriterBubble(true, isFirstOnly);
+        this._dom.chatMessages.appendChild(firstRow);
+        this._scrollToBottom();
+
+        // 等待淡出完成
+        await this._sleep(250);
+        if (typing.parentNode) typing.remove();
 
         // 后台已分好段 → 逐段打字机效果 + 头像只在最新段显示
         // 段间停顿根据下一段长度动态调整（情绪感知：情绪消息附加犹豫延迟）
@@ -4346,48 +4441,57 @@ const UIController = {
           if (len < 200) return 350 + Math.floor(Math.random() * 250) + moodBonus;
           return 500 + Math.floor(Math.random() * 400) + moodBonus;
         };
-        let prevRow = null;
+        // 第一段：用已创建的第一个气泡（它在 fade-out 时已弹入）
+        let prevRow = firstRow;
+        if (this._animId !== animId) return;
+        let bubbleEl = firstRow.querySelector('.msg-bubble');
+        let cleaned = StyleVariator.vary(this._stripMarkdown(segments[0]));
+        let len = cleaned.length;
+        bubbleEl.classList.add('streaming');
+        for (let j = 0; j < len; j++) {
+          if (this._animId !== animId) return;
+          bubbleEl.textContent += cleaned[j];
+          this._scrollToBottom();
+          let speed;
+          if (len < 30) { speed = 22; } else {
+            const pos = j / len;
+            speed = (pos < 0.2 || pos > 0.8) ? 22 : 15;
+          }
+          await this._sleep(speed);
+        }
+        bubbleEl.classList.remove('streaming');
 
-        for (let i = 0; i < segments.length; i++) {
-          // 被新消息取消
+        // 后续段：逐段创建 + 打字机
+        for (let i = 1; i < segments.length; i++) {
           if (this._animId !== animId) return;
 
-          if (i > 0) await this._sleep(getSegmentGap(segments[i]));
+          await this._sleep(getSegmentGap(segments[i]));
           if (this._animId !== animId) return;
 
-          // 头像从上一段挪到当前段：隐藏上一段的头像
+          // 隐藏上一段头像
           if (prevRow) {
-            const prevAvatar = prevRow.querySelector('.msg-avatar');
-            if (prevAvatar) prevAvatar.style.visibility = 'hidden';
+            const pa = prevRow.querySelector('.msg-avatar');
+            if (pa) pa.style.visibility = 'hidden';
             prevRow.classList.add('no-avatar');
           }
 
-          const isFirst = i === 0;
           const isLast = i === segments.length - 1;
-          const row = this._createTypewriterBubble(isFirst, isLast);
+          const row = this._createTypewriterBubble(false, isLast);
           this._dom.chatMessages.appendChild(row);
           this._scrollToBottom();
 
-          // 打字机逐字输出（三段式变速：慢-快-慢，模拟真人打字节奏）
-          const bubbleEl = row.querySelector('.msg-bubble');
-          const cleaned = StyleVariator.vary(this._stripMarkdown(segments[i]));
-          const len = cleaned.length;
+          bubbleEl = row.querySelector('.msg-bubble');
+          cleaned = StyleVariator.vary(this._stripMarkdown(segments[i]));
+          len = cleaned.length;
           bubbleEl.classList.add('streaming');
           for (let j = 0; j < len; j++) {
             if (this._animId !== animId) return;
             bubbleEl.textContent += cleaned[j];
             this._scrollToBottom();
-            // 短消息（<30字）不减速，保持灵动
             let speed;
-            if (len < 30) {
-              speed = 22;
-            } else {
+            if (len < 30) { speed = 22; } else {
               const pos = j / len;
-              if (pos < 0.2 || pos > 0.8) {
-                speed = 22; // 开头和结尾 20%：慢（22ms），模拟斟酌措辞和收尾确认
-              } else {
-                speed = 15; // 中间 60%：正常速度（15ms），流畅输出
-              }
+              speed = (pos < 0.2 || pos > 0.8) ? 22 : 15;
             }
             await this._sleep(speed);
           }
