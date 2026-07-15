@@ -1619,6 +1619,66 @@ const UserMemoryManager = {
 };
 
 /* ========================================
+   EmotionTracker — 情感状态追踪（关键词检测，零API调用）
+   ======================================== */
+const EmotionTracker = {
+  /** 情绪关键词库 */
+  keywords: {
+    sad: ['分手', '失去', '想哭', '难受', '撑不住', '心碎', '崩溃', '抑郁', '孤独',
+          '好累', '绝望', '哭', '心累', '撑不下去', '好难过', '好痛', '走不出来'],
+    angry: ['气死了', '凭什么', '太过分', '受不了', '恶心', '傻逼', '无语', '火大',
+            '气死', 'tm', '他妈', '想骂人', '气炸', '忍不了', '无耻', '不要脸'],
+    anxious: ['怎么办', '万一', '好怕', '担心', '睡不着', '纠结', '迷茫', '不知道',
+              '焦虑', '紧张', '害怕', '不安', '不确定', '慌', '怕', '很慌'],
+  },
+
+  /** 检测最近N条用户消息的情绪状态 */
+  detect(chat, lookback = 3) {
+    if (!chat || !chat.messages) return 'calm';
+
+    const userMsgs = chat.messages
+      .filter(m => m.role === 'user')
+      .slice(-lookback)
+      .map(m => m.content);
+
+    if (userMsgs.length === 0) return 'calm';
+
+    const scores = { sad: 0, angry: 0, anxious: 0 };
+
+    for (const msg of userMsgs) {
+      for (const [mood, words] of Object.entries(this.keywords)) {
+        for (const word of words) {
+          if (msg.includes(word)) {
+            scores[mood] = (scores[mood] || 0) + 1;
+          }
+        }
+      }
+    }
+
+    // 找出得分最高的情绪，需要 ≥ 2 分才激活
+    const maxScore = Math.max(scores.sad, scores.angry, scores.anxious);
+    if (maxScore < 2) return 'calm';
+
+    // 同分优先级：难过 > 愤怒 > 焦虑
+    if (scores.sad >= maxScore) return 'sad';
+    if (scores.angry >= maxScore) return 'angry';
+    if (scores.anxious >= maxScore) return 'anxious';
+    return 'calm';
+  },
+
+  /** 获取情绪对应的 Prompt 注入文本 */
+  getInjection(mood) {
+    const injections = {
+      sad: '\n\n[情绪感知：对方现在情绪低落，第一句话先共情和陪伴，不要急着分析和给建议。语气温柔一点。]',
+      angry: '\n\n[情绪感知：对方现在很生气，先认可TA的情绪——"确实气人""换谁谁不气"——然后再帮TA理性分析。别泼冷水火上浇油。]',
+      anxious: '\n\n[情绪感知：对方现在很焦虑，你给的建议要比平时更具体和确定，少用反问和留白，多用"我觉得你可以…"的明确指引来帮TA稳住。]',
+      calm: '',
+    };
+    return injections[mood] || '';
+  },
+};
+
+/* ========================================
    SafetyGuard — 领域预检 + 危机检测
    ======================================== */
 const SafetyGuard = {
@@ -2256,6 +2316,13 @@ const ChatManager = {
       }
       sceneText += ']';
       context[0].content += sceneText;
+
+      // 情感状态追踪注入（在场景描述之后，帮助模型调整回复基调）
+      const mood = EmotionTracker.detect(chat);
+      const moodInjection = EmotionTracker.getInjection(mood);
+      if (moodInjection) {
+        context[0].content += moodInjection;
+      }
     }
 
     return context.concat(chat.messages);
