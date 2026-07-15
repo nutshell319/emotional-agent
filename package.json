@@ -1,6 +1,6 @@
 {
   "name": "warmth",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "description": "Warmth — 情感沟通助手",
   "main": "main.js",
   "scripts": {
