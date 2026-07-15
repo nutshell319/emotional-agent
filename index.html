@@ -143,20 +143,17 @@ html, body {
 .main-layout.ready { opacity: 1; }
 
 /* 聊天区加载淡入 */
-.chat-messages {
-  opacity: 0;
-  transition: opacity 0.35s ease;
-  position: relative;
-}
 .chat-messages.fade-ready { opacity: 1; }
 
-/* 聊天记录加载提示 */
+/* 聊天记录加载提示（独立于聊天区，不受其 opacity 影响） */
 .chat-loading-hint {
   position: absolute; top: 50%; left: 50%;
   transform: translate(-50%, -50%);
   font-size: 13px; color: var(--text-muted);
   display: flex; align-items: center; gap: 8px;
   animation: hintPulse 1s ease-in-out infinite;
+  z-index: 5;
+  transition: opacity 0.3s ease;
 }
 .chat-loading-hint::before {
   content: '';
@@ -165,6 +162,7 @@ html, body {
   background: var(--persona-color);
   animation: hintDot 1.4s infinite ease-in-out;
 }
+.chat-loading-hint.fading { opacity: 0; }
 @keyframes hintPulse { 0%, 100% { opacity: 0.5; } 50% { opacity: 1; } }
 @keyframes hintDot {
   0%, 60%, 100% { transform: scale(0.5); opacity: 0.3; }
@@ -4656,19 +4654,18 @@ const UIController = {
       }
     });
 
-    // 先让容器透明，插入内容，延迟后渐入（模拟自然加载节奏）
-    this._dom.chatMessages.style.opacity = '0';
+    // 先插入完整内容，再显示加载提示（提示独立于聊天内容，不受 opacity 影响）
     this._dom.chatMessages.appendChild(fragment);
     this._scrollToBottom();
-    // 显示加载提示
+
     const hint = document.createElement('div');
     hint.className = 'chat-loading-hint';
     hint.textContent = '加载聊天记录中…';
-    this._dom.chatMessages.appendChild(hint);
+    this._dom.mainArea.appendChild(hint);
+
     setTimeout(() => {
-      hint.remove();
-      this._dom.chatMessages.style.opacity = '';
-      this._dom.chatMessages.classList.add('fade-ready');
+      hint.classList.add('fading');
+      setTimeout(() => hint.remove(), 300);
     }, 500);
   },
 
