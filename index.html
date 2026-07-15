@@ -4170,7 +4170,7 @@ const UIController = {
     const innerCount = Math.ceil(allNodes.length / 2);
     const innerR = 130, outerR = 210;
 
-    // 第一遍：先渲染所有连线（底层）
+    // 第一遍：先渲染节点文本框
     const positions = [];
     allNodes.forEach((f, i) => {
       const onInner = i < innerCount;
@@ -4180,17 +4180,17 @@ const UIController = {
       const jitter = (Math.random() - 0.5) * 0.25;
       const angle = (ringIdx / ringNodes) * Math.PI * 2 - Math.PI / 2 + jitter;
       positions.push({ ...f, angle, dist, i });
-      const lx = cx + Math.cos(angle) * 20;
-      const ly = cy + Math.sin(angle) * 20;
-      html += '<div class="memory-line" style="left:' + lx + 'px;top:' + ly + 'px;width:' + (dist - 28) + 'px;transform:rotate(' + angle + 'rad)"></div>';
+      const nx = cx + Math.cos(angle) * dist - 45;
+      const ny = cy + Math.sin(angle) * dist - 12;
+      const delay = i * 0.04 + Math.random() * 0.06;
+      html += '<div class="memory-node ' + f.cat + '" style="left:' + nx + 'px;top:' + ny + 'px;animation-delay:' + delay.toFixed(2) + 's" title="' + f.content.replace(/"/g, '&quot;') + '" data-fact-id="' + (f.id || '') + '">' + f.content + '</div>';
     });
 
-    // 第二遍：再渲染节点（上层，覆盖连线）
+    // 第二遍：再渲染连线（连线端点在节点上方可见）
     positions.forEach((p) => {
-      const nx = cx + Math.cos(p.angle) * p.dist - 45;
-      const ny = cy + Math.sin(p.angle) * p.dist - 12;
-      const delay = p.i * 0.04 + Math.random() * 0.06;
-      html += '<div class="memory-node ' + p.cat + '" style="left:' + nx + 'px;top:' + ny + 'px;animation-delay:' + delay.toFixed(2) + 's" title="' + p.content.replace(/"/g, '&quot;') + '" data-fact-id="' + (p.id || '') + '">' + p.content + '</div>';
+      const lx = cx + Math.cos(p.angle) * 20;
+      const ly = cy + Math.sin(p.angle) * 20;
+      html += '<div class="memory-line" style="left:' + lx + 'px;top:' + ly + 'px;width:' + (p.dist - 28) + 'px;transform:rotate(' + p.angle + 'rad)"></div>';
     });
 
     html += '<div class="memory-float-hint">点击节点可删除 · 点击空白处关闭</div>';
