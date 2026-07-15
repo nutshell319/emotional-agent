@@ -33,10 +33,10 @@
 
 /* 浅色主题 */
 [data-theme="light"] {
-  --bg: #f8f6f2;
-  --text: #2d2a26;
-  --text-dim: #6b6560;
-  --text-muted: #9b9590;
+  --bg: #f5f0e8;
+  --text: #3d3830;
+  --text-dim: #7a7268;
+  --text-muted: #a09890;
   --card-bg: rgba(0,0,0,0.03);
   --card-border: rgba(0,0,0,0.08);
   --msg-user-bg: rgba(0,0,0,0.04);
@@ -67,6 +67,7 @@ html, body {
   width: 100%; height: 100%;
   overflow: hidden;
   background: var(--bg);
+  transition: background 0.4s ease, color 0.4s ease;
   color: var(--text);
   font-family: var(--font);
   font-size: 15px;
@@ -747,7 +748,7 @@ input, textarea {
   margin: 0;
   padding: 0;
   overflow: hidden;
-  transition: opacity 0.2s ease, max-height 0.25s ease 0.05s, margin 0.25s ease, padding 0.25s ease;
+  transition: opacity 0.4s ease, max-height 0.5s ease 0.1s, margin 0.5s ease, padding 0.5s ease;
 }
 #typingIndicator .thinking-dot.got-it {
   animation: thinkingGotIt 0.6s infinite ease-in-out;
@@ -4410,11 +4411,11 @@ const UIController = {
         const emotionState = EmotionTracker.getState(ChatManager.getCurrentChat());
         let preDelay;
         if (emotionState === 'sad' || emotionState === 'anxious') {
-          preDelay = 600 + Math.floor(Math.random() * 600);
+          preDelay = 800 + Math.floor(Math.random() * 600);  // 800-1400ms
         } else if (emotionState === 'angry') {
-          preDelay = 400 + Math.floor(Math.random() * 400);
+          preDelay = 600 + Math.floor(Math.random() * 400);  // 600-1000ms
         } else {
-          preDelay = 300 + Math.floor(Math.random() * 600);
+          preDelay = 500 + Math.floor(Math.random() * 600);  // 500-1100ms
         }
         await this._sleep(preDelay);
         if (this._animId !== animId) return;
@@ -4428,8 +4429,8 @@ const UIController = {
         this._dom.chatMessages.appendChild(firstRow);
         this._scrollToBottom();
 
-        // 等待淡出完成
-        await this._sleep(250);
+        // 等待淡出完成（让气泡弹出和思考行消失的交叉更明显）
+        await this._sleep(400);
         if (typing.parentNode) typing.remove();
 
         // 后台已分好段 → 逐段打字机效果 + 头像只在最新段显示
