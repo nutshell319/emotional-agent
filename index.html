@@ -160,13 +160,6 @@ html, body {
   30% { transform: scale(1.3); opacity: 1; }
 }
 
-/* 启动阶段禁用所有动画，防止窗口 show 时积压爆发 */
-.no-anim *, .no-anim *::before, .no-anim *::after {
-  animation-duration: 0s !important;
-  animation-delay: 0s !important;
-  transition-duration: 0s !important;
-}
-
 /* 背景纹理 */
 body::before {
   content: '';
@@ -1452,7 +1445,7 @@ input, textarea {
 .ocr-status.error { color: var(--accent); }
 </style>
 </head>
-<body class="no-anim">
+<body>
 <div class="splash-screen" id="splashScreen">
   <div class="splash-content">
     <div class="splash-icon"></div>
@@ -3744,8 +3737,6 @@ const UIController = {
   _inputDraft: '',       // 按上键前暂存的当前输入框内容
 
   init() {
-    const _t0 = performance.now();
-    console.log('[UI] init start +0ms');
     this._dom = {
       sidebar: document.getElementById('sidebar'),
       chatList: document.getElementById('chatList'),
@@ -3776,37 +3767,23 @@ const UIController = {
     this._bindSettingsEvents();
     this._initCustomSelects(this._dom.settingsPanel);
     this._loadSettingsToForm();
-    const t1 = performance.now();
-    console.log('[UI] DOM cached +' + (t1 - _t0).toFixed(0) + 'ms');
     this._renderUserProfileCard();
-    console.log('[UI] renderUserProfile done +' + (performance.now() - _t0).toFixed(0) + 'ms');
     this._renderSidebar();
-    console.log('[UI] renderSidebar done +' + (performance.now() - _t0).toFixed(0) + 'ms');
     this._loadLastChat();
-    console.log('[UI] loadLastChat done +' + (performance.now() - _t0).toFixed(0) + 'ms');
     this._checkFirstRun();
 
     const savedTheme = SettingsManager.getAll().theme || 'dark';
     this._applyTheme(savedTheme);
-    console.log('[UI] theme applied +' + (performance.now() - _t0).toFixed(0) + 'ms');
 
-    this._finishSplash(_t0);
-    console.log('[UI] init end +' + (performance.now() - _t0).toFixed(0) + 'ms');
+    this._finishSplash();
   },
 
-  _finishSplash(t0) {
+  _finishSplash() {
     const splash = document.getElementById('splashScreen');
     if (!splash) return;
-    const _t = performance.now();
-    console.log('[UI] finishSplash scheduled +' + (_t - t0).toFixed(0) + 'ms');
     setTimeout(() => {
-      console.log('[UI] splash fade-out start +' + (performance.now() - t0).toFixed(0) + 'ms');
       splash.classList.add('fade-out');
-      document.body.classList.remove('no-anim');
-      setTimeout(() => {
-        console.log('[UI] splash removed +' + (performance.now() - t0).toFixed(0) + 'ms');
-        splash.remove();
-      }, 550);
+      setTimeout(() => splash.remove(), 550);
     }, 1000); // 延迟到窗口 show() 之后，确保用户看到的是完整遮罩
   },
 
