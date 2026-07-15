@@ -1,15 +1,15 @@
-const { app, BrowserWindow, Menu, screen } = require('electron');
+const { app, BrowserWindow, Menu } = require('electron');
 const path = require('path');
 
 let mainWindow = null;
 
 function createWindow() {
-  const { width, height } = screen.getPrimaryDisplay().workAreaSize;
-
   mainWindow = new BrowserWindow({
-    width, height,
+    width: 960,
+    height: 600,
     minWidth: 720,
     minHeight: 450,
+    show: false,
     backgroundColor: '#08090d',
     title: 'Warmth',
     icon: path.join(__dirname, 'icon.ico'),
@@ -22,6 +22,11 @@ function createWindow() {
 
   Menu.setApplicationMenu(null);
   mainWindow.loadFile('index.html');
+
+  mainWindow.once('ready-to-show', () => {
+    mainWindow.maximize();  // Windows 原生最大化，自动适配任务栏
+    mainWindow.show();       // 最大化完成后才显示
+  });
 
   mainWindow.on('closed', () => {
     mainWindow = null;
