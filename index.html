@@ -22,6 +22,26 @@
   --font: "Microsoft YaHei", "PingFang SC", system-ui, sans-serif;
   --sidebar-width: 260px;
   --settings-width: 340px;
+  --persona-color: #b98eff;
+  --persona-glow: rgba(185,142,255,0.15);
+  --persona-gradient: linear-gradient(135deg, #d4a0ff, #f28b9f);
+}
+
+/* 人格配色切换 */
+[data-persona="nuanxin"] {
+  --persona-color: #f4a0b0;
+  --persona-glow: rgba(244,160,176,0.15);
+  --persona-gradient: linear-gradient(135deg, #f7c5d0, #f4a0b0);
+}
+[data-persona="junshi"] {
+  --persona-color: #6eb5ff;
+  --persona-glow: rgba(110,181,255,0.15);
+  --persona-gradient: linear-gradient(135deg, #8ec8ff, #5ba0f0);
+}
+[data-persona="shudong"] {
+  --persona-color: #c4b5e0;
+  --persona-glow: rgba(196,181,224,0.15);
+  --persona-gradient: linear-gradient(135deg, #d8ceeb, #b8a5d8);
 }
 
 html, body {
@@ -132,19 +152,20 @@ input, textarea {
 .sidebar-logo {
   display: flex; align-items: center; gap: 8px;
   font-size: 16px; font-weight: 700;
-  color: var(--title);
+  color: var(--persona-color);
+  transition: color 0.4s ease;
 }
 .sidebar-logo .logo-icon { font-size: 24px; }
 .sidebar-btn {
   width: 32px; height: 32px;
   border-radius: 8px;
-  background: rgba(185,142,255,0.1);
-  color: var(--title);
+  background: var(--persona-glow);
+  color: var(--persona-color);
   font-size: 18px;
   display: flex; align-items: center; justify-content: center;
   transition: background 0.2s;
 }
-.sidebar-btn:hover { background: rgba(185,142,255,0.2); }
+.sidebar-btn:hover { background: var(--persona-glow); filter: brightness(1.5); }
 
 .chat-list {
   flex: 1;
@@ -439,7 +460,8 @@ input, textarea {
 .msg-row.agent .msg-avatar {
   width: 36px; height: 36px;
   font-size: 18px;
-  background: linear-gradient(135deg, #d4a0ff, #f28b9f);
+  background: var(--persona-gradient);
+  transition: background 0.4s ease;
 }
 
 /* 内容包裹层 — 防止flex撑开 */
@@ -471,15 +493,20 @@ input, textarea {
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   border: 1px solid rgba(255,255,255,0.07);
+  border-left: 2px solid var(--persona-color);
   border-radius: 14px;
   color: var(--text);
+  transition: border-color 0.2s;
+}
+.msg-row.agent .msg-bubble:hover {
+  border-color: rgba(255,255,255,0.12);
 }
 
 /* streaming 光标 */
 .msg-row.agent .msg-bubble.streaming::after {
   content: ' ▌';
   animation: blink 0.8s infinite;
-  color: var(--title);
+  color: var(--persona-color);
 }
 
 /* 分段回复的连续气泡 — 紧凑间距 */
@@ -580,7 +607,7 @@ input, textarea {
   display: inline-block;
   width: 6px; height: 6px;
   border-radius: 50%;
-  background: var(--title);
+  background: var(--persona-color);
   animation: thinkingWave 1.4s infinite ease-in-out;
 }
 #typingIndicator .thinking-dot:nth-child(2) { animation-delay: 0.2s; }
@@ -4495,10 +4522,23 @@ const UIController = {
     const settings = SettingsManager.getAll();
     const name = settings.agentName || 'Warmth';
     const persona = PERSONAS[settings.persona] || PERSONAS['dushe'];
+
+    // 全局 CSS 变量切换
+    document.documentElement.setAttribute('data-persona', persona.id);
+
+    // 侧边栏 logo 弹跳动画
     const logoIcon = document.getElementById('sidebarLogoIcon');
-    if (logoIcon) logoIcon.textContent = persona.icon;
+    if (logoIcon) {
+      logoIcon.textContent = persona.icon;
+      logoIcon.style.transition = 'transform 0.3s cubic-bezier(.22,1,.36,1)';
+      logoIcon.style.transform = 'scale(1.3)';
+      requestAnimationFrame(() => {
+        logoIcon.style.transform = 'scale(1)';
+      });
+    }
     document.getElementById('sidebarLogoName').textContent = name;
     document.title = persona.icon + ' ' + name;
+
     // 更新空状态图标
     const emptyIcon = document.querySelector('.empty-icon');
     if (emptyIcon) emptyIcon.textContent = persona.icon;
