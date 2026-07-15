@@ -262,10 +262,9 @@ input, textarea {
   padding: 2px 6px;
 }
 
-/* 记忆脑图 */
+/* 记忆脑图侧边栏按钮 */
 .memory-graph-area {
   padding: 4px 12px;
-  border-top: 1px solid var(--card-border);
   flex-shrink: 0;
 }
 .memory-graph-toggle {
@@ -283,40 +282,83 @@ input, textarea {
 .memory-toggle-arrow {
   margin-left: auto;
   font-size: 10px;
-  transition: transform 0.25s ease;
+  transition: transform 0.3s ease;
 }
 .memory-graph-toggle.open .memory-toggle-arrow { transform: rotate(90deg); }
-.memory-graph {
-  position: relative;
-  height: 200px;
-  margin-top: 6px;
-  overflow: hidden;
-  animation: graphIn 0.35s ease;
+
+/* 记忆脑图浮动窗 */
+.memory-float-overlay {
+  position: fixed; inset: 0;
+  background: transparent;
+  z-index: 150;
+  animation: overlayIn 0.25s ease;
 }
-@keyframes graphIn { from { opacity: 0; height: 0; } to { opacity: 1; height: 200px; } }
+@keyframes overlayIn { from { background: transparent; } to { background: var(--scrim); } }
+.memory-float-panel {
+  position: fixed;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%) scale(0.9);
+  width: 440px; height: 380px;
+  background: var(--modal-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 16px;
+  box-shadow: 0 16px 48px rgba(0,0,0,0.4);
+  z-index: 151;
+  opacity: 0;
+  transition: opacity 0.3s ease, transform 0.35s cubic-bezier(.22,1,.36,1);
+  display: flex; flex-direction: column;
+  overflow: hidden;
+}
+.memory-float-panel.open {
+  opacity: 1;
+  transform: translate(-50%, -50%) scale(1);
+}
+.memory-float-header {
+  padding: 12px 16px;
+  display: flex; align-items: center; justify-content: space-between;
+  border-bottom: 1px solid var(--card-border);
+  flex-shrink: 0;
+}
+.memory-float-header h4 { font-size: 14px; color: var(--text); margin: 0; }
+.memory-float-close {
+  width: 28px; height: 28px;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-dim);
+  font-size: 16px;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: all 0.15s;
+}
+.memory-float-close:hover { background: var(--fill-light); color: var(--text); }
+.memory-float-body {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+}
 .memory-node {
   position: absolute;
-  padding: 3px 8px;
-  border-radius: 10px;
-  font-size: 10px;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 11px;
   white-space: nowrap;
-  max-width: 100px;
+  max-width: 110px;
   overflow: hidden; text-overflow: ellipsis;
   cursor: pointer;
   transition: transform 0.15s, opacity 0.3s;
-  animation: nodeIn 0.4s ease both;
+  animation: nodeFloatIn 0.5s ease both;
 }
-@keyframes nodeIn { from { opacity: 0; transform: scale(0); } to { opacity: 1; transform: scale(1); } }
-.memory-node:hover { transform: scale(1.15); z-index: 5; }
+@keyframes nodeFloatIn { from { opacity: 0; transform: scale(0) translateY(8px); } to { opacity: 1; transform: scale(1) translateY(0); } }
+.memory-node:hover { transform: scale(1.2); z-index: 5; box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
 .memory-node.behavior { background: rgba(100,180,255,0.15); border: 1px solid rgba(100,180,255,0.3); color: #8ec8ff; }
 .memory-node.personality { background: rgba(200,160,255,0.15); border: 1px solid rgba(200,160,255,0.3); color: #c8a0ff; }
 .memory-node.experience { background: rgba(255,200,100,0.15); border: 1px solid rgba(255,200,100,0.3); color: #ffc864; }
 .memory-node.need { background: rgba(255,140,160,0.15); border: 1px solid rgba(255,140,160,0.3); color: #ff8ca0; }
 .memory-node.deleting { opacity: 0; transform: scale(0); }
-.memory-center {
+.memory-center-icon {
   position: absolute; top: 50%; left: 50%;
   transform: translate(-50%, -50%);
-  font-size: 28px;
+  font-size: 36px;
   animation: brainPulse 2.5s ease-in-out infinite;
   z-index: 2;
 }
@@ -329,10 +371,12 @@ input, textarea {
   height: 1px;
   background: var(--card-border);
   transform-origin: left center;
-  opacity: 0.5;
-  transition: opacity 0.2s;
+  opacity: 0.3;
 }
-.memory-node:hover + .memory-line { opacity: 0.8; }
+.memory-float-hint {
+  position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%);
+  font-size: 10px; color: var(--text-muted);
+}
 
 .sidebar-footer {
   padding: 10px 12px;
@@ -1351,7 +1395,6 @@ input, textarea {
         🧠 <span id="memoryGraphCount">0</span> 条记忆
         <span class="memory-toggle-arrow">▸</span>
       </button>
-      <div class="memory-graph" id="memoryGraph" style="display:none"></div>
     </div>
     <div class="sidebar-footer">
       <button class="theme-toggle" id="btnThemeToggle" title="切换主题">
@@ -3738,15 +3781,10 @@ const UIController = {
     this._dom.btnProfileHint.addEventListener('click', () => this._openProfileModal());
     this._dom.profileHintBar.addEventListener('click', () => this._openProfileModal());
 
-    // 记忆脑图展开/折叠
+    // 记忆脑图浮动窗
     const btnMemGraph = document.getElementById('btnMemoryGraph');
-    const memGraph = document.getElementById('memoryGraph');
-    if (btnMemGraph && memGraph) {
-      btnMemGraph.addEventListener('click', () => {
-        const isOpen = memGraph.style.display !== 'none';
-        if (isOpen) { memGraph.style.display = 'none'; btnMemGraph.classList.remove('open'); }
-        else { this._renderMemoryGraph(); memGraph.style.display = 'block'; btnMemGraph.classList.add('open'); }
-      });
+    if (btnMemGraph) {
+      btnMemGraph.addEventListener('click', () => this._toggleMemoryGraph());
     }
 
     // 键盘快捷键
@@ -4092,21 +4130,20 @@ const UIController = {
     this._renderMemoryGraph();
   },
 
-  /** 渲染记忆脑图 */
+  /** 渲染记忆脑图到浮动窗 */
   _renderMemoryGraph() {
     const memory = UserMemoryManager.get();
     const countEl = document.getElementById('memoryGraphCount');
-    const graphEl = document.getElementById('memoryGraph');
-    if (!countEl || !graphEl) return;
+    if (countEl) countEl.textContent = memory.facts.length;
 
-    countEl.textContent = memory.facts.length;
+    const body = document.querySelector('.memory-float-body');
+    if (!body) return;
+
     if (memory.facts.length === 0) {
-      graphEl.style.display = 'none';
-      document.getElementById('btnMemoryGraph').classList.remove('open');
+      body.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-muted);font-size:13px">还没有提取到记忆<br>聊几轮后会自动出现</div>';
       return;
     }
 
-    // 分类事实
     const categories = { behavior: [], personality: [], experience: [], need: [] };
     const behaviorKw = ['冷战', '逃避', '忍让', '讨好', '吵架', '妥协', '沉默', '主动', '依赖', '控制'];
     const personalityKw = ['敏感', '焦虑', '开朗', '内向', '外向', '固执', '感性', '理性', '自卑', '自信', '脆弱', '坚强'];
@@ -4120,34 +4157,31 @@ const UIController = {
       else categories.experience.push(f);
     });
 
-    // 所有节点按类别排列，均匀分布
     const allNodes = [];
-    const catOrder = ['personality', 'behavior', 'need', 'experience'];
-    catOrder.forEach(cat => {
+    ['personality', 'behavior', 'need', 'experience'].forEach(cat => {
       categories[cat].forEach(f => allNodes.push({ ...f, cat }));
     });
 
-    const w = 240, h = 200, cx = w / 2, cy = h / 2, r = 75;
-    let html = '<div class="memory-center">🧠</div>';
+    const w = 440, h = 320, cx = w / 2, cy = h / 2, r = 120;
+    let html = '<div class="memory-center-icon">🧠</div>';
 
     allNodes.forEach((f, i) => {
       const angle = (i / allNodes.length) * Math.PI * 2 - Math.PI / 2;
-      const x = cx + Math.cos(angle) * r - 40;
-      const y = cy + Math.sin(angle) * r - 10;
-      const delay = i * 0.04;
-      html += '<div class="memory-node ' + f.cat + '" style="left:' + x + 'px;top:' + y + 'px;animation-delay:' + delay + 's" title="' + f.content.replace(/"/g, '&quot;') + '" data-fact-id="' + (f.id || '') + '">' + f.content + '</div>';
-      // 连线
-      const lineAngle = (i / allNodes.length) * Math.PI * 2 - Math.PI / 2;
-      const lx = cx + Math.cos(lineAngle) * 14;
-      const ly = cy + Math.sin(lineAngle) * 14;
-      const lw = r - 20;
-      html += '<div class="memory-line" style="left:' + lx + 'px;top:' + ly + 'px;width:' + lw + 'px;transform:rotate(' + (lineAngle * 180 / Math.PI) + 'rad)"></div>';
+      const nx = cx + Math.cos(angle) * r - 45;
+      const ny = cy + Math.sin(angle) * r - 12;
+      const delay = i * 0.06;
+      html += '<div class="memory-node ' + f.cat + '" style="left:' + nx + 'px;top:' + ny + 'px;animation-delay:' + delay + 's" title="' + f.content.replace(/"/g, '&quot;') + '" data-fact-id="' + (f.id || '') + '">' + f.content + '</div>';
+      const la = (i / allNodes.length) * Math.PI * 2 - Math.PI / 2;
+      const lx = cx + Math.cos(la) * 20;
+      const ly = cy + Math.sin(la) * 20;
+      html += '<div class="memory-line" style="left:' + lx + 'px;top:' + ly + 'px;width:' + (r - 28) + 'px;transform:rotate(' + la + 'rad)"></div>';
     });
 
-    graphEl.innerHTML = html;
+    html += '<div class="memory-float-hint">点击节点可删除 · 点击空白处关闭</div>';
+    body.innerHTML = html;
 
-    // 点击节点删除
-    graphEl.querySelectorAll('.memory-node').forEach(node => {
+    // 节点点击删除
+    body.querySelectorAll('.memory-node').forEach(node => {
       node.addEventListener('click', (e) => {
         e.stopPropagation();
         const factId = node.dataset.factId;
@@ -4161,6 +4195,52 @@ const UIController = {
         }
       });
     });
+  },
+
+  /** 打开记忆脑图浮动窗 */
+  _toggleMemoryGraph() {
+    let overlay = document.getElementById('memoryFloatOverlay');
+    if (overlay) { this._closeMemoryGraph(); return; }
+
+    overlay = document.createElement('div');
+    overlay.className = 'memory-float-overlay';
+    overlay.id = 'memoryFloatOverlay';
+    overlay.innerHTML = `
+      <div class="memory-float-panel" id="memoryFloatPanel">
+        <div class="memory-float-header">
+          <h4>🧠 记忆脑图</h4>
+          <button class="memory-float-close" id="memoryFloatClose">✕</button>
+        </div>
+        <div class="memory-float-body"></div>
+      </div>`;
+    document.body.appendChild(overlay);
+
+    // 触发打开动画
+    requestAnimationFrame(() => {
+      document.getElementById('memoryFloatPanel').classList.add('open');
+    });
+
+    document.getElementById('memoryFloatClose').addEventListener('click', () => this._closeMemoryGraph());
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) this._closeMemoryGraph();
+    });
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') this._closeMemoryGraph();
+    }, { once: true });
+
+    document.getElementById('btnMemoryGraph').classList.add('open');
+    this._renderMemoryGraph();
+  },
+
+  /** 关闭脑图浮动窗 */
+  _closeMemoryGraph() {
+    const panel = document.getElementById('memoryFloatPanel');
+    const overlay = document.getElementById('memoryFloatOverlay');
+    if (panel) {
+      panel.classList.remove('open');
+      setTimeout(() => { if (overlay) overlay.remove(); }, 350);
+    }
+    document.getElementById('btnMemoryGraph').classList.remove('open');
   },
 
   _openUserProfileModal() {
