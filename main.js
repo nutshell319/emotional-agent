@@ -9,21 +9,24 @@ function createWindow() {
     height: 600,
     minWidth: 720,
     minHeight: 450,
-    // 16:10 横屏比例，适配 Windows 桌面使用场景
+    show: false,  // 先隐藏，等最大化完成后再显示，避免窗口缩放闪烁
     title: 'Warmth',
     icon: path.join(__dirname, 'icon.ico'),
     webPreferences: {
-      webSecurity: false,       // 允许跨域请求（百度OCR等）
-      nodeIntegration: false,   // 安全：网页不直接访问Node
+      webSecurity: false,
+      nodeIntegration: false,
       contextIsolation: true,
     },
   });
 
-  // 隐藏菜单栏
   Menu.setApplicationMenu(null);
-
   mainWindow.loadFile('index.html');
-  mainWindow.maximize(); // 启动时最大化窗口
+  mainWindow.maximize();
+
+  // 最大化完成后再显示窗口
+  mainWindow.once('ready-to-show', () => {
+    mainWindow.show();
+  });
 
   mainWindow.on('closed', () => {
     mainWindow = null;
