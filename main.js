@@ -25,6 +25,12 @@ function createWindow() {
   console.log('[Main] BrowserWindow created +' + (Date.now() - t0) + 'ms');
 
   Menu.setApplicationMenu(null);
+
+  // 将渲染进程的 console 输出转发到主进程终端
+  mainWindow.webContents.on('console-message', (event, level, message) => {
+    console.log('[Renderer] ' + message);
+  });
+
   mainWindow.loadFile('index.html');
   console.log('[Main] loadFile called +' + (Date.now() - t0) + 'ms');
 

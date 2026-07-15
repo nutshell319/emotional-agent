@@ -3806,15 +3806,6 @@ const UIController = {
       setTimeout(() => {
         console.log('[UI] splash removed +' + (performance.now() - t0).toFixed(0) + 'ms');
         splash.remove();
-        // 诊断：检查是否有意外的布局变化
-        const observer = new MutationObserver((mutations) => {
-          mutations.forEach(m => {
-            if (m.type === 'attributes' && m.attributeName === 'style') return; // 忽略style变化
-            console.warn('[FlashDiag] 意外DOM变更:', m.type, m.target.tagName, m.target.className || m.target.id, '+' + (performance.now() - t0).toFixed(0) + 'ms');
-          });
-        });
-        observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['class', 'style'] });
-        console.log('[UI] MutationObserver started for flash diagnosis');
       }, 550);
     }, 200);
   },
@@ -4664,19 +4655,9 @@ const UIController = {
       }
     });
 
-    // 先插入完整内容，再显示加载提示（提示独立于聊天内容，不受 opacity 影响）
+    // 直接渲染，不用加载提示——引导屏本身就是过渡动画
     this._dom.chatMessages.appendChild(fragment);
     this._scrollToBottom();
-
-    const hint = document.createElement('div');
-    hint.className = 'chat-loading-hint';
-    hint.textContent = '加载聊天记录中…';
-    this._dom.mainArea.appendChild(hint);
-
-    setTimeout(() => {
-      hint.classList.add('fading');
-      setTimeout(() => hint.remove(), 300);
-    }, 500);
   },
 
   _createUserBubble(msg) {
