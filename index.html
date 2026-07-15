@@ -1692,6 +1692,62 @@ const EmotionTracker = {
     };
     return injections[mood] || '';
   },
+
+  /** 情绪标签和严重程度映射 */
+  MOOD_LABELS: { sad: '难过', angry: '愤怒', anxious: '焦虑', calm: '平静' },
+  MOOD_SEVERITY: { calm: 0, anxious: 1, sad: 2, angry: 3 },
+
+  /** 对单条消息打分，返回 { mood, score }（不设阈值，0分也返回calm） */
+  scoreMessage(text) {
+    if (!text) return { mood: 'calm', score: 0 };
+    const scores = { sad: 0, angry: 0, anxious: 0 };
+    for (const [mood, words] of Object.entries(this.keywords)) {
+      for (const word of words) {
+        if (text.includes(word)) {
+          scores[mood] = (scores[mood] || 0) + 1;
+        }
+      }
+    }
+    const maxScore = Math.max(scores.sad, scores.angry, scores.anxious);
+    if (maxScore === 0) return { mood: 'calm', score: 0 };
+    // 同分优先级：sad > angry > anxious
+    if (scores.sad >= maxScore) return { mood: 'sad', score: scores.sad };
+    if (scores.angry >= maxScore) return { mood: 'angry', score: scores.angry };
+    return { mood: 'anxious', score: scores.anxious };
+  },
+
+  /** 比较最近2条有emotion数据的用户消息，返回情绪变化描述；不足2条或无数据返回null */
+  getEvolution(chat) {
+    if (!chat || !chat.messages) return null;
+    // 找到最近2条有emotion字段的用户消息
+    const scored = [];
+    for (let i = chat.messages.length - 1; i >= 0; i--) {
+      const m = chat.messages[i];
+      if (m.role === 'user' && m.emotion) {
+        scored.unshift(m.emotion);
+        if (scored.length >= 2) break;
+      }
+    }
+    if (scored.length < 2) return null;
+
+    const prev = this.MOOD_SEVERITY[scored[0].mood] || 0;
+    const curr = this.MOOD_SEVERITY[scored[1].mood] || 0;
+    const prevLabel = this.MOOD_LABELS[scored[0].mood] || '平静';
+    const currLabel = this.MOOD_LABELS[scored[1].mood] || '平静';
+
+    // 持续平静无需提示
+    if (curr === 0 && prev === 0) return null;
+
+    if (curr > prev + 1) {
+      return '情绪越来越差了（开始只是' + prevLabel + '，现在明显' + currLabel + '），需要更谨慎地安抚';
+    } else if (curr > prev) {
+      return '情绪有点加重（从' + prevLabel + '变成了' + currLabel + '），注意不要刺激对方';
+    } else if (curr < prev) {
+      return '情绪在好转（刚才还' + prevLabel + '，现在' + currLabel + '了），可以适当轻松一点';
+    } else {
+      return '情绪持续' + currLabel + '中，和上一条消息状态差不多';
+    }
+  },
 };
 
 /* ========================================
@@ -2551,6 +2607,12 @@ const ChatManager = {
       if (moodInjection) {
         context[0].content += moodInjection;
       }
+
+      // 情绪演化注入（比较最近两条消息的情绪变化趋势）
+      const evolution = EmotionTracker.getEvolution(chat);
+      if (evolution) {
+        context[0].content += '\n\n[情绪演化：' + evolution + '。根据情绪的变化趋势调整回复策略。]';
+      }
     }
 
     return context.concat(chat.messages);
@@ -2638,7 +2700,7 @@ const ChatManager = {
     if (crisisResponse) {
       const chat = this._ensureChat();
       chat.messages.push(
-        { role: 'user', content: userInput, timestamp: new Date().toISOString() },
+        { role: 'user', content: userInput, timestamp: new Date().toISOString(), emotion: EmotionTracker.scoreMessage(userInput) },
         { role: 'assistant', content: crisisResponse, timestamp: new Date().toISOString() }
       );
       StorageManager.saveChat(chat);
@@ -2648,7 +2710,7 @@ const ChatManager = {
 
     // 3. 保存用户消息
     const chat = this._ensureChat();
-    const userMsg = { role: 'user', content: userInput, timestamp: new Date().toISOString() };
+    const userMsg = { role: 'user', content: userInput, timestamp: new Date().toISOString(), emotion: EmotionTracker.scoreMessage(userInput) };
     chat.messages.push(userMsg);
     onUserMsg(userMsg);
     if (chat.messages.length === 1) {
