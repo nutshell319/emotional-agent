@@ -291,9 +291,9 @@ input, textarea {
   position: fixed; inset: 0;
   background: transparent;
   z-index: 150;
-  animation: overlayIn 0.25s ease;
+  transition: background 0.3s ease;
 }
-@keyframes overlayIn { from { background: transparent; } to { background: var(--scrim); } }
+.memory-float-overlay.open { background: var(--scrim); }
 .memory-float-panel {
   position: fixed;
   top: 50%; left: 50%;
@@ -305,13 +305,16 @@ input, textarea {
   box-shadow: 0 16px 48px rgba(0,0,0,0.4);
   z-index: 151;
   opacity: 0;
-  transition: opacity 0.3s ease, transform 0.35s cubic-bezier(.22,1,.36,1);
+  visibility: hidden;
+  transition: opacity 0.3s ease, transform 0.35s cubic-bezier(.22,1,.36,1), visibility 0s 0.35s;
   display: flex; flex-direction: column;
   overflow: hidden;
 }
 .memory-float-panel.open {
   opacity: 1;
+  visibility: visible;
   transform: translate(-50%, -50%) scale(1);
+  transition: opacity 0.3s ease, transform 0.35s cubic-bezier(.22,1,.36,1), visibility 0s 0s;
 }
 .memory-float-header {
   padding: 12px 16px;
@@ -4224,7 +4227,7 @@ const UIController = {
     overlay.className = 'memory-float-overlay';
     overlay.id = 'memoryFloatOverlay';
     overlay.innerHTML = `
-      <div class="memory-float-panel" id="memoryFloatPanel" style="visibility:hidden">
+      <div class="memory-float-panel" id="memoryFloatPanel">
         <div class="memory-float-header">
           <h4>🧠 记忆脑图</h4>
           <button class="memory-float-close" id="memoryFloatClose">✕</button>
@@ -4233,15 +4236,10 @@ const UIController = {
       </div>`;
     document.body.appendChild(overlay);
 
-    // 双帧确保初始状态已绘制，再触发过渡动画避免闪屏
+    // 单帧后同时触发 overlay 和 panel 的过渡动画
     requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        const panel = document.getElementById('memoryFloatPanel');
-        if (panel) {
-          panel.style.visibility = 'visible';
-          panel.classList.add('open');
-        }
-      });
+      overlay.classList.add('open');
+      document.getElementById('memoryFloatPanel').classList.add('open');
     });
 
     document.getElementById('memoryFloatClose').addEventListener('click', () => this._closeMemoryGraph());
@@ -4260,8 +4258,9 @@ const UIController = {
   _closeMemoryGraph() {
     const panel = document.getElementById('memoryFloatPanel');
     const overlay = document.getElementById('memoryFloatOverlay');
-    if (panel) {
+    if (panel && overlay) {
       panel.classList.remove('open');
+      overlay.classList.remove('open');
       setTimeout(() => { if (overlay) overlay.remove(); }, 350);
     }
     document.getElementById('btnMemoryGraph').classList.remove('open');
