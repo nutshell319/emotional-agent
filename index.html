@@ -262,6 +262,78 @@ input, textarea {
   padding: 2px 6px;
 }
 
+/* 记忆脑图 */
+.memory-graph-area {
+  padding: 4px 12px;
+  border-top: 1px solid var(--card-border);
+  flex-shrink: 0;
+}
+.memory-graph-toggle {
+  width: 100%;
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-dim);
+  font-size: 12px;
+  cursor: pointer;
+  display: flex; align-items: center; gap: 6px;
+  transition: all 0.15s;
+}
+.memory-graph-toggle:hover { background: var(--fill-light); }
+.memory-toggle-arrow {
+  margin-left: auto;
+  font-size: 10px;
+  transition: transform 0.25s ease;
+}
+.memory-graph-toggle.open .memory-toggle-arrow { transform: rotate(90deg); }
+.memory-graph {
+  position: relative;
+  height: 200px;
+  margin-top: 6px;
+  overflow: hidden;
+  animation: graphIn 0.35s ease;
+}
+@keyframes graphIn { from { opacity: 0; height: 0; } to { opacity: 1; height: 200px; } }
+.memory-node {
+  position: absolute;
+  padding: 3px 8px;
+  border-radius: 10px;
+  font-size: 10px;
+  white-space: nowrap;
+  max-width: 100px;
+  overflow: hidden; text-overflow: ellipsis;
+  cursor: pointer;
+  transition: transform 0.15s, opacity 0.3s;
+  animation: nodeIn 0.4s ease both;
+}
+@keyframes nodeIn { from { opacity: 0; transform: scale(0); } to { opacity: 1; transform: scale(1); } }
+.memory-node:hover { transform: scale(1.15); z-index: 5; }
+.memory-node.behavior { background: rgba(100,180,255,0.15); border: 1px solid rgba(100,180,255,0.3); color: #8ec8ff; }
+.memory-node.personality { background: rgba(200,160,255,0.15); border: 1px solid rgba(200,160,255,0.3); color: #c8a0ff; }
+.memory-node.experience { background: rgba(255,200,100,0.15); border: 1px solid rgba(255,200,100,0.3); color: #ffc864; }
+.memory-node.need { background: rgba(255,140,160,0.15); border: 1px solid rgba(255,140,160,0.3); color: #ff8ca0; }
+.memory-node.deleting { opacity: 0; transform: scale(0); }
+.memory-center {
+  position: absolute; top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 28px;
+  animation: brainPulse 2.5s ease-in-out infinite;
+  z-index: 2;
+}
+@keyframes brainPulse {
+  0%, 100% { transform: translate(-50%, -50%) scale(1); }
+  50% { transform: translate(-50%, -50%) scale(1.08); }
+}
+.memory-line {
+  position: absolute;
+  height: 1px;
+  background: var(--card-border);
+  transform-origin: left center;
+  opacity: 0.5;
+  transition: opacity 0.2s;
+}
+.memory-node:hover + .memory-line { opacity: 0.8; }
+
 .sidebar-footer {
   padding: 10px 12px;
   border-top: 1px solid var(--card-border);
@@ -1274,6 +1346,13 @@ input, textarea {
     <div class="user-profile-area" id="userProfileArea"></div>
     <div class="profile-area" id="profileArea"></div>
     <div class="chat-list" id="chatList"></div>
+    <div class="memory-graph-area" id="memoryGraphArea">
+      <button class="memory-graph-toggle" id="btnMemoryGraph">
+        🧠 <span id="memoryGraphCount">0</span> 条记忆
+        <span class="memory-toggle-arrow">▸</span>
+      </button>
+      <div class="memory-graph" id="memoryGraph" style="display:none"></div>
+    </div>
     <div class="sidebar-footer">
       <button class="theme-toggle" id="btnThemeToggle" title="切换主题">
         <span class="theme-icon">🌙</span>
@@ -1773,21 +1852,40 @@ const UserMemoryManager = {
     this.save(memory);
   },
 
-  /** 合并新提取的事实（按 content 去重） */
+  /** 计算两段文本的字符集 Jaccard 相似度（排除常见虚词） */
+  _similarity(a, b) {
+    const strip = s => s.replace(/[的了我他是她它不和也很就在要会有能可以去都还吗呢吧啊哦嗯这那个什么怎么因为所以但是]/g, '');
+    const charsA = new Set(strip(a).split(''));
+    const charsB = new Set(strip(b).split(''));
+    const intersection = [...charsA].filter(c => charsB.has(c)).length;
+    const union = new Set([...charsA, ...charsB]).size;
+    return union === 0 ? 0 : intersection / union;
+  },
+
+  /** 合并新提取的事实（精确 + 语义去重） */
   mergeFacts(newFacts) {
     const memory = this.get();
-    const existingContents = new Set(memory.facts.map(f => f.content));
     const added = [];
     newFacts.forEach(f => {
-      if (!existingContents.has(f.content)) {
-        f.id = crypto.randomUUID ? crypto.randomUUID() : 'fact-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6);
-        f.timestamp = new Date().toISOString();
-        f.source = f.source || 'extracted';
-        memory.facts.push(f);
-        added.push(f);
+      // 精确匹配去重
+      const exactMatch = memory.facts.some(ex => ex.content === f.content);
+      if (exactMatch) return;
+      // 语义相似度去重（> 0.6 视为重复，保留更长的）
+      const similarIdx = memory.facts.findIndex(ex => this._similarity(ex.content, f.content) > 0.6);
+      if (similarIdx >= 0) {
+        const existing = memory.facts[similarIdx];
+        if (f.content.length > existing.content.length) {
+          memory.facts[similarIdx] = { ...existing, content: f.content, timestamp: new Date().toISOString() };
+        }
+        return;
       }
+      f.id = crypto.randomUUID ? crypto.randomUUID() : 'fact-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6);
+      f.timestamp = new Date().toISOString();
+      f.source = f.source || 'extracted';
+      memory.facts.push(f);
+      added.push(f);
     });
-    // 最多保留 30 条，旧的在前
+    // 最多保留 30 条
     if (memory.facts.length > 30) {
       memory.facts = memory.facts.slice(-30);
     }
@@ -1796,6 +1894,49 @@ const UserMemoryManager = {
       this.save(memory);
     }
     return added.length;
+  },
+
+  /** 当事实超过20条时，调用LLM提炼合并 */
+  async refineFacts() {
+    const memory = this.get();
+    if (memory.facts.length <= 20) return;
+    const settings = SettingsManager.getAll();
+    if (!settings.apiKey) return;
+
+    const factsText = memory.facts.map((f, i) => (i + 1) + '. ' + f.content).join('\n');
+    const prompt = '你是一个记忆提炼器。以下是关于用户的记忆片段列表（共' + memory.facts.length + '条）。\n\n请做以下操作：\n1. 合并高度相似的记忆（语义相同但措辞不同的合并为一条）\n2. 总结模式性的记忆（多条记忆指向同一特征时合并为概括性的描述）\n3. 删除明显过时或矛盾的记忆\n4. 最终输出不超过15条，每条简洁明确、不超过20字\n\n保持输出格式：每行一条，用 "- " 开头。\n\n记忆列表：\n' + factsText + '\n\n提炼后的关键事实：';
+
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 15000);
+      const response = await fetch(settings.baseURL + '/chat/completions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + settings.apiKey },
+        body: JSON.stringify({
+          model: settings.model,
+          messages: [{ role: 'user', content: prompt }],
+          temperature: 0.3,
+          stream: false,
+        }),
+        signal: controller.signal,
+      });
+      clearTimeout(timeoutId);
+      if (!response.ok) return;
+      const data = await response.json();
+      const result = data.choices?.[0]?.message?.content || '';
+      const lines = result.split('\n').map(l => l.replace(/^[-\d.]+\s*/, '').trim()).filter(l => l && l !== '无');
+      if (lines.length > 0) {
+        memory.facts = lines.map(content => ({
+          id: crypto.randomUUID ? crypto.randomUUID() : 'fact-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6),
+          content: content.slice(0, 30),
+          timestamp: new Date().toISOString(),
+          source: 'refined',
+        }));
+        this.save(memory);
+      }
+    } catch (_) {
+      // 提炼失败静默，保留原记忆
+    }
   },
 
   /** 删除单条事实 */
@@ -1850,7 +1991,7 @@ const UserMemoryManager = {
     const userMessages = chatMessages.filter(m => m.role === 'user').map(m => m.content);
     const recentMsgs = userMessages.slice(-10).join('\n---\n');
 
-    return '你是一个用户画像提取器。从以下对话中提取关于"用户自己"的稳定特质和经历。\n\n只提取用户明确透露的关于自己的信息，比如：\n- 依恋风格（焦虑型/回避型/安全型）\n- 重要经历（分手时间、感情历史、个人成长转折）\n- 性格特征（敏感、容易焦虑、不擅表达、讨好型人格）\n- 感情需求（需要安全感、害怕冲突、需要空间）\n- 行为模式（一吵架就冷战、习惯性忍让、遇到矛盾先逃避）\n\n严格禁止提取以下内容：\n- 任何涉及"对象/TA/对方/他/她"做了什么或没做什么的事实（如"对象不理我""TA喜欢冷战""他出轨了"）\n- 只适用于当前对话场景的临时信息\n- 用户只是在转述或描述别人的行为\n\n只提取用户自身的、跨场景适用的稳定特质。不确定是否该提取时，宁可不提取。\n\n输出格式：每行一条事实，用 "- " 开头。每条事实简洁明确，不超过20个字。\n如果没有发现值得长期记住的新事实，输出 "无"。\n\n对话内容：\n---\n' + recentMsgs + '\n---\n\n用户关键事实：';
+    return '你是一个用户画像提取器。从以下对话中提取关于"用户自己"的稳定特质和经历。\n\n只提取用户明确透露的关于自己的信息，比如：\n- 依恋风格（焦虑型/回避型/安全型）\n- 重要经历（分手时间、感情历史、个人成长转折）\n- 性格特征（敏感、容易焦虑、不擅表达、讨好型人格）\n- 感情需求（需要安全感、害怕冲突、需要空间）\n- 行为模式（一吵架就冷战、习惯性忍让、遇到矛盾先逃避）\n\n严格禁止提取以下内容：\n- 任何涉及"对象/TA/对方/他/她"做了什么或没做什么的事实（如"对象不理我""TA喜欢冷战""他出轨了"）\n- 只适用于当前对话场景的临时信息\n- 用户只是在转述或描述别人的行为\n\n**关键实体区分规则（必须遵守）：**\n- "我/我自己XX"→ 用户自身特质 → 可以提取\n- "她说她XX" / "TA说TAXX" / "他说他XX" → 这是对象/他人的特质 → 禁止提取\n- "我觉得我很XX" → 用户自身 → 可以提取\n- "我觉得她XX" / "她是一个XX的人" → 对象特质 → 禁止提取\n- 任何包含"她说"/"TA说"/"他说"的转述中，只有用户自身的部分可提取\n\n❌ 错误示例：用户说"她说她很好哄" → 不能提取"用户很好哄"（这是她的特质不是用户的）\n✅ 正确示例：用户说"我这个人很好哄" → 可提取"用户觉得自己好哄"\n\n只提取用户自身的、跨场景适用的稳定特质。不确定是否该提取时，宁可不提取。\n\n输出格式：每行一条事实，用 "- " 开头。每条事实简洁明确，不超过20个字。\n如果没有发现值得长期记住的新事实，输出 "无"。\n\n对话内容：\n---\n' + recentMsgs + '\n---\n\n用户关键事实：';
   },
 
   /** 异步提取事实 */
@@ -1905,6 +2046,7 @@ const UserMemoryManager = {
 
       if (facts.length > 0) {
         this.mergeFacts(facts);
+        this.refineFacts(); // 超过20条时自动提炼合并
       }
     } catch (_) {
       // 提取失败静默忽略，不影响主流程
@@ -3596,6 +3738,17 @@ const UIController = {
     this._dom.btnProfileHint.addEventListener('click', () => this._openProfileModal());
     this._dom.profileHintBar.addEventListener('click', () => this._openProfileModal());
 
+    // 记忆脑图展开/折叠
+    const btnMemGraph = document.getElementById('btnMemoryGraph');
+    const memGraph = document.getElementById('memoryGraph');
+    if (btnMemGraph && memGraph) {
+      btnMemGraph.addEventListener('click', () => {
+        const isOpen = memGraph.style.display !== 'none';
+        if (isOpen) { memGraph.style.display = 'none'; btnMemGraph.classList.remove('open'); }
+        else { this._renderMemoryGraph(); memGraph.style.display = 'block'; btnMemGraph.classList.add('open'); }
+      });
+    }
+
     // 键盘快捷键
     document.addEventListener('keydown', (e) => {
       if (e.ctrlKey && e.key === 'n') {
@@ -3936,6 +4089,78 @@ const UIController = {
         </div>
       </div>`;
     document.getElementById('userProfileCard').addEventListener('click', () => this._openUserProfileModal());
+    this._renderMemoryGraph();
+  },
+
+  /** 渲染记忆脑图 */
+  _renderMemoryGraph() {
+    const memory = UserMemoryManager.get();
+    const countEl = document.getElementById('memoryGraphCount');
+    const graphEl = document.getElementById('memoryGraph');
+    if (!countEl || !graphEl) return;
+
+    countEl.textContent = memory.facts.length;
+    if (memory.facts.length === 0) {
+      graphEl.style.display = 'none';
+      document.getElementById('btnMemoryGraph').classList.remove('open');
+      return;
+    }
+
+    // 分类事实
+    const categories = { behavior: [], personality: [], experience: [], need: [] };
+    const behaviorKw = ['冷战', '逃避', '忍让', '讨好', '吵架', '妥协', '沉默', '主动', '依赖', '控制'];
+    const personalityKw = ['敏感', '焦虑', '开朗', '内向', '外向', '固执', '感性', '理性', '自卑', '自信', '脆弱', '坚强'];
+    const needKw = ['安全感', '空间', '被爱', '理解', '认可', '自由', '陪伴', '尊重', '信任', '关心'];
+
+    memory.facts.forEach(f => {
+      const t = f.content;
+      if (needKw.some(k => t.includes(k))) categories.need.push(f);
+      else if (behaviorKw.some(k => t.includes(k))) categories.behavior.push(f);
+      else if (personalityKw.some(k => t.includes(k))) categories.personality.push(f);
+      else categories.experience.push(f);
+    });
+
+    // 所有节点按类别排列，均匀分布
+    const allNodes = [];
+    const catOrder = ['personality', 'behavior', 'need', 'experience'];
+    catOrder.forEach(cat => {
+      categories[cat].forEach(f => allNodes.push({ ...f, cat }));
+    });
+
+    const w = 240, h = 200, cx = w / 2, cy = h / 2, r = 75;
+    let html = '<div class="memory-center">🧠</div>';
+
+    allNodes.forEach((f, i) => {
+      const angle = (i / allNodes.length) * Math.PI * 2 - Math.PI / 2;
+      const x = cx + Math.cos(angle) * r - 40;
+      const y = cy + Math.sin(angle) * r - 10;
+      const delay = i * 0.04;
+      html += '<div class="memory-node ' + f.cat + '" style="left:' + x + 'px;top:' + y + 'px;animation-delay:' + delay + 's" title="' + f.content.replace(/"/g, '&quot;') + '" data-fact-id="' + (f.id || '') + '">' + f.content + '</div>';
+      // 连线
+      const lineAngle = (i / allNodes.length) * Math.PI * 2 - Math.PI / 2;
+      const lx = cx + Math.cos(lineAngle) * 14;
+      const ly = cy + Math.sin(lineAngle) * 14;
+      const lw = r - 20;
+      html += '<div class="memory-line" style="left:' + lx + 'px;top:' + ly + 'px;width:' + lw + 'px;transform:rotate(' + (lineAngle * 180 / Math.PI) + 'rad)"></div>';
+    });
+
+    graphEl.innerHTML = html;
+
+    // 点击节点删除
+    graphEl.querySelectorAll('.memory-node').forEach(node => {
+      node.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const factId = node.dataset.factId;
+        if (factId) {
+          node.classList.add('deleting');
+          setTimeout(() => {
+            UserMemoryManager.deleteFact(factId);
+            this._renderMemoryGraph();
+            this._renderUserProfileCard();
+          }, 300);
+        }
+      });
+    });
   },
 
   _openUserProfileModal() {
