@@ -23,6 +23,7 @@ function createWindow() {
   Menu.setApplicationMenu(null);
 
   mainWindow.loadFile('index.html');
+  mainWindow.maximize(); // 启动时最大化窗口
 
   mainWindow.on('closed', () => {
     mainWindow = null;
