@@ -29,17 +29,18 @@
   --msg-agent-bg: var(--fill-light);
   --sidebar-bg: rgba(255,255,255,0.015);
   --scrim: rgba(0,0,0,0.5);
-  --fill-dim: var(--fill-dim);
-  --fill-subtle: var(--fill-subtle);
-  --fill-light: var(--fill-light);
-  --fill-medium: var(--fill-medium);
-  --fill-strong: var(--fill-strong);
-  --border-subtle: var(--border-subtle);
-  --border-light: var(--fill-medium);
-  --border-medium: var(--border-medium);
-  --border-strong: var(--border-strong);
-  --hover-bg: var(--fill-medium);
-  --dot-grid: var(--fill-subtle);
+  --fill-dim: rgba(255,255,255,0.02);
+  --fill-subtle: rgba(255,255,255,0.03);
+  --fill-light: rgba(255,255,255,0.04);
+  --fill-medium: rgba(255,255,255,0.06);
+  --fill-strong: rgba(255,255,255,0.08);
+  --border-subtle: rgba(255,255,255,0.05);
+  --border-light: rgba(255,255,255,0.06);
+  --border-medium: rgba(255,255,255,0.07);
+  --border-strong: rgba(255,255,255,0.1);
+  --hover-bg: rgba(255,255,255,0.06);
+  --dot-grid: rgba(255,255,255,0.03);
+  --modal-bg: #111118;
 }
 
 /* 浅色主题 */
@@ -66,6 +67,7 @@
   --border-strong: rgba(0,0,0,0.12);
   --hover-bg: rgba(0,0,0,0.06);
   --dot-grid: rgba(0,0,0,0.03);
+  --modal-bg: #faf7f2;
 }
 
 /* 人格配色切换 */
@@ -1005,14 +1007,14 @@ input, textarea {
 /* Profile Form Modal */
 .profile-modal-overlay {
   position: fixed; inset: 0;
-  background: rgba(0,0,0,0.5);
+  background: var(--scrim);
   z-index: 200;
   display: flex; align-items: center; justify-content: center;
   animation: fadeIn 0.2s ease;
 }
 .profile-modal {
   width: 460px; max-height: 80vh;
-  background: #111118;
+  background: var(--modal-bg);
   border: 1px solid var(--card-border);
   border-radius: 14px;
   padding: 24px;
@@ -1062,7 +1064,7 @@ input, textarea {
   position: absolute;
   top: calc(100% + 4px);
   left: 0; right: 0;
-  background: #111118;
+  background: var(--modal-bg);
   border: 1px solid var(--border-strong);
   border-radius: 10px;
   overflow: hidden;
