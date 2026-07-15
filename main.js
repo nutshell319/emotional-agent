@@ -4,6 +4,9 @@ const path = require('path');
 let mainWindow = null;
 
 function createWindow() {
+  const t0 = Date.now();
+  console.log('[Main] createWindow start');
+
   mainWindow = new BrowserWindow({
     width: 960,
     height: 600,
@@ -19,14 +22,18 @@ function createWindow() {
       contextIsolation: true,
     },
   });
+  console.log('[Main] BrowserWindow created +' + (Date.now() - t0) + 'ms');
 
   Menu.setApplicationMenu(null);
   mainWindow.loadFile('index.html');
+  console.log('[Main] loadFile called +' + (Date.now() - t0) + 'ms');
 
-  // 最大化完成后再显示，杜绝窗口缩放闪烁
   mainWindow.once('ready-to-show', () => {
+    console.log('[Main] ready-to-show +' + (Date.now() - t0) + 'ms');
     mainWindow.maximize();
+    console.log('[Main] maximize done +' + (Date.now() - t0) + 'ms');
     mainWindow.show();
+    console.log('[Main] show() done +' + (Date.now() - t0) + 'ms');
   });
 
   mainWindow.on('closed', () => {

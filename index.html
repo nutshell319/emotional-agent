@@ -3744,6 +3744,8 @@ const UIController = {
   _inputDraft: '',       // 按上键前暂存的当前输入框内容
 
   init() {
+    const _t0 = performance.now();
+    console.log('[UI] init start +0ms');
     this._dom = {
       sidebar: document.getElementById('sidebar'),
       chatList: document.getElementById('chatList'),
@@ -3768,36 +3770,52 @@ const UIController = {
       settingsPanel: document.getElementById('settingsPanel'),
       settingsOverlay: document.getElementById('settingsOverlay'),
       toastContainer: document.getElementById('toastContainer'),
-      userProfileArea: document.getElementById('userProfileArea'),
-      profileArea: document.getElementById('profileArea'),
-      mainArea: document.getElementById('mainArea'),
     };
 
     this._bindEvents();
     this._bindSettingsEvents();
     this._initCustomSelects(this._dom.settingsPanel);
     this._loadSettingsToForm();
-    this._renderUserProfileCard();  // 用户画像全局持久，只渲染一次
+    const t1 = performance.now();
+    console.log('[UI] DOM cached +' + (t1 - _t0).toFixed(0) + 'ms');
+    this._renderUserProfileCard();
+    console.log('[UI] renderUserProfile done +' + (performance.now() - _t0).toFixed(0) + 'ms');
     this._renderSidebar();
+    console.log('[UI] renderSidebar done +' + (performance.now() - _t0).toFixed(0) + 'ms');
     this._loadLastChat();
+    console.log('[UI] loadLastChat done +' + (performance.now() - _t0).toFixed(0) + 'ms');
     this._checkFirstRun();
 
-    // 应用保存的主题
     const savedTheme = SettingsManager.getAll().theme || 'dark';
     this._applyTheme(savedTheme);
+    console.log('[UI] theme applied +' + (performance.now() - _t0).toFixed(0) + 'ms');
 
-    // 等待聊天区渲染完成后再淡出引导屏
-    this._finishSplash();
+    this._finishSplash(_t0);
+    console.log('[UI] init end +' + (performance.now() - _t0).toFixed(0) + 'ms');
   },
 
-  _finishSplash() {
+  _finishSplash(t0) {
     const splash = document.getElementById('splashScreen');
     if (!splash) return;
+    const _t = performance.now();
+    console.log('[UI] finishSplash scheduled +' + (_t - t0).toFixed(0) + 'ms');
     setTimeout(() => {
+      console.log('[UI] splash fade-out start +' + (performance.now() - t0).toFixed(0) + 'ms');
       splash.classList.add('fade-out');
-      // 引导屏开始淡出时恢复全局动画
       document.body.classList.remove('no-anim');
-      setTimeout(() => splash.remove(), 500);
+      setTimeout(() => {
+        console.log('[UI] splash removed +' + (performance.now() - t0).toFixed(0) + 'ms');
+        splash.remove();
+        // 诊断：检查是否有意外的布局变化
+        const observer = new MutationObserver((mutations) => {
+          mutations.forEach(m => {
+            if (m.type === 'attributes' && m.attributeName === 'style') return; // 忽略style变化
+            console.warn('[FlashDiag] 意外DOM变更:', m.type, m.target.tagName, m.target.className || m.target.id, '+' + (performance.now() - t0).toFixed(0) + 'ms');
+          });
+        });
+        observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['class', 'style'] });
+        console.log('[UI] MutationObserver started for flash diagnosis');
+      }, 550);
     }, 200);
   },
 
