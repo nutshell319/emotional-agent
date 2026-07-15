@@ -4168,6 +4168,8 @@ const UIController = {
     this._dom.chatMessages.innerHTML = '';
 
     if (!chat || chat.messages.length === 0) {
+      // innerHTML='' 会把 emptyState 从 DOM 移除，需要重新插入
+      this._dom.chatMessages.appendChild(this._dom.emptyState);
       this._dom.emptyState.style.display = 'flex';
       this._dom.mainArea.classList.add('is-empty');
       return;
