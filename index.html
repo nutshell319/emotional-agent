@@ -1151,7 +1151,7 @@ input, textarea {
 
       <div class="settings-group">
         <label>助手人格</label>
-        <div class="custom-select settings-custom-select" id="settingPersona" data-value="dushe">
+        <div class="custom-select settings-custom-select" id="settingPersona" data-value="dushe" data-settings-key="persona">
           <div class="custom-select-trigger">👧🏻 毒舌闺蜜</div>
           <div class="custom-select-panel">
             <div class="custom-select-option selected" data-value="dushe">👧🏻 毒舌闺蜜 — 损友风格，嘴毒心软</div>
@@ -1198,7 +1198,7 @@ input, textarea {
 
       <div class="settings-group">
         <label>模型</label>
-        <div class="custom-select settings-custom-select" id="settingModel" data-value="deepseek-v4-flash">
+        <div class="custom-select settings-custom-select" id="settingModel" data-value="deepseek-v4-flash" data-settings-key="model">
           <div class="custom-select-trigger">DeepSeek V4 Flash</div>
           <div class="custom-select-panel">
             <div class="custom-select-option" data-value="deepseek-v4-pro">DeepSeek V4 Pro</div>
@@ -3865,10 +3865,30 @@ const UIController = {
           e.stopPropagation();
           const val = opt.getAttribute('data-value');
           cs.setAttribute('data-value', val);
-          trigger.textContent = val || '不填';
           options.forEach(o => o.classList.remove('selected'));
           opt.classList.add('selected');
           cs.classList.remove('open');
+
+          // 如果有关联的 SettingsManager key，自动保存
+          const settingsKey = cs.getAttribute('data-settings-key');
+          if (settingsKey) {
+            SettingsManager.set(settingsKey, val);
+            // 人格切换：更新显示文本 + 品牌联动
+            if (settingsKey === 'persona') {
+              const p = PERSONAS[val] || PERSONAS['dushe'];
+              trigger.textContent = p.icon + ' ' + p.name;
+              this._updateBranding();
+              this._showToast('已切换到「' + p.name + '」人格', 'success');
+            } else {
+              trigger.textContent = val || '不填';
+            }
+            // 模型切换：更新 API 状态
+            if (settingsKey === 'model') {
+              this._updateApiStatus();
+            }
+          } else {
+            trigger.textContent = val || '不填';
+          }
         });
       });
     });
@@ -3998,30 +4018,6 @@ const UIController = {
       const raw = parseFloat(document.getElementById('settingTemperature').value);
       SettingsManager.set('temperature', !isNaN(raw) ? raw : 0.7);
       this._updateApiStatus();
-    });
-
-    // 模型选择（自定义下拉）— 选项点击时保存
-    document.querySelector('#settingModel .custom-select-panel').addEventListener('click', (e) => {
-      const opt = e.target.closest('.custom-select-option');
-      if (!opt) return;
-      const val = opt.getAttribute('data-value');
-      if (val) {
-        SettingsManager.set('model', val);
-        this._updateApiStatus();
-      }
-    });
-
-    // 人格选择（自定义下拉）— 选项点击时保存
-    document.querySelector('#settingPersona .custom-select-panel').addEventListener('click', (e) => {
-      const opt = e.target.closest('.custom-select-option');
-      if (!opt) return;
-      const val = opt.getAttribute('data-value');
-      if (val) {
-        SettingsManager.set('persona', val);
-        this._updateBranding();
-        const p = PERSONAS[val];
-        this._showToast('已切换到「' + (p ? p.name : val) + '」人格', 'success');
-      }
     });
 
     // 助手昵称
