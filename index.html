@@ -2285,6 +2285,23 @@ const ChatManager = {
 
     const totalLen = segments.reduce((sum, s) => sum + s.length, 0);
 
+    // 超长单段回复：超过350字强制拆分（模拟真人分几次发消息）
+    if (totalLen > 350 && segments.length === 1 && segments[0].length > 350) {
+      const text = segments[0];
+      // 在句号/问号/感叹号处寻找合适断点（后半段的40%-60%范围）
+      const midStart = Math.floor(text.length * 0.4);
+      const midEnd = Math.floor(text.length * 0.6);
+      let splitPos = text.indexOf('。', midStart);
+      if (splitPos === -1 || splitPos > midEnd) splitPos = text.indexOf('？', midStart);
+      if (splitPos === -1 || splitPos > midEnd) splitPos = text.indexOf('！', midStart);
+      if (splitPos === -1 || splitPos > midEnd) splitPos = text.indexOf('\n', midStart);
+      if (splitPos === -1 || splitPos > midEnd) splitPos = Math.floor(text.length / 2); // 找不到断点就硬切
+      const part1 = text.slice(0, splitPos + 1).trim();
+      const part2 = text.slice(splitPos + 1).trim();
+      console.log('[Split] 长回复拆分（' + totalLen + '字）→ ' + part1.length + '字 + ' + part2.length + '字');
+      return [part1, part2];
+    }
+
     // 只有一段或整体很短 → 不拆分
     if (segments.length <= 1 || totalLen < 150) {
       console.log('[Split] 1段（' + totalLen + '字）');
@@ -3323,13 +3340,18 @@ const UIController = {
         if (typing._thinkingTimer) { clearInterval(typing._thinkingTimer); typing._thinkingTimer = null; }
         typing.remove();
 
+        // 回复前随机停顿（300-900ms），模拟"看完消息→思考→开始打字"
+        const preDelay = 300 + Math.floor(Math.random() * 600);
+        await this._sleep(preDelay);
+        if (this._animId !== animId) return;
+
         // 后台已分好段 → 逐段打字机效果 + 头像只在最新段显示
-        const segmentGap = 280;  // 段与段之间的停顿 ms
-        const getTypeSpeed = (text) => {
-          const len = text.length;
-          if (len < 50) return 22;     // 短段落慢一点，有"斟酌措辞"感
-          if (len < 150) return 15;    // 中等段落正常速度
-          return 10;                    // 长段落略快，减少等待感
+        // 段间停顿根据下一段长度动态调整
+        const getSegmentGap = (nextText) => {
+          const len = (nextText || '').length;
+          if (len < 80) return 200 + Math.floor(Math.random() * 200);    // 200-400ms
+          if (len < 200) return 350 + Math.floor(Math.random() * 250);   // 350-600ms
+          return 500 + Math.floor(Math.random() * 400);                  // 500-900ms
         };
         let prevRow = null;
 
@@ -3337,7 +3359,7 @@ const UIController = {
           // 被新消息取消
           if (this._animId !== animId) return;
 
-          if (i > 0) await this._sleep(segmentGap);
+          if (i > 0) await this._sleep(getSegmentGap(segments[i]));
           if (this._animId !== animId) return;
 
           // 头像从上一段挪到当前段：隐藏上一段的头像
@@ -3353,14 +3375,26 @@ const UIController = {
           this._dom.chatMessages.appendChild(row);
           this._scrollToBottom();
 
-          // 打字机逐字输出（速度自适应段落长度）
+          // 打字机逐字输出（三段式变速：慢-快-慢，模拟真人打字节奏）
           const bubbleEl = row.querySelector('.msg-bubble');
           const cleaned = this._stripMarkdown(segments[i]);
-          const speed = getTypeSpeed(cleaned);
-          for (let j = 0; j < cleaned.length; j++) {
+          const len = cleaned.length;
+          for (let j = 0; j < len; j++) {
             if (this._animId !== animId) return;
             bubbleEl.textContent += cleaned[j];
             this._scrollToBottom();
+            // 短消息（<30字）不减速，保持灵动
+            let speed;
+            if (len < 30) {
+              speed = 22;
+            } else {
+              const pos = j / len;
+              if (pos < 0.2 || pos > 0.8) {
+                speed = 22; // 开头和结尾 20%：慢（22ms），模拟斟酌措辞和收尾确认
+              } else {
+                speed = 15; // 中间 60%：正常速度（15ms），流畅输出
+              }
+            }
             await this._sleep(speed);
           }
 
