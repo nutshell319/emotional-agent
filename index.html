@@ -3773,29 +3773,20 @@ const UIController = {
   _finishSplash() {
     const splash = document.getElementById('splashScreen');
     if (!splash) return;
-    // setTimeout(0) 让出主线程给浏览器完成首次绘制，再撤引导屏
+    // 让浏览器先完成首次绘制（聊天区已由 _renderMessages 控制淡入）
     setTimeout(() => {
       const app = document.getElementById('app');
-      const chatMsgs = document.getElementById('chatMessages');
-      const chatList = document.getElementById('chatList');
-      // 侧边栏聊天列表逐条出现
-      if (chatList) chatList.querySelectorAll('.chat-item').forEach((item, i) => {
-        item.style.animationDelay = (i * 0.03) + 's';
-      });
-      // 聊天消息逐条淡入
-      if (chatMsgs) {
-        chatMsgs.querySelectorAll('.msg-row').forEach((row, i) => {
-          row.style.animationDelay = (i * 0.04) + 's';
-        });
-        chatMsgs.classList.add('fade-ready');
-      }
       if (app) app.classList.add('ready');
-      // 引导屏淡出
-      requestAnimationFrame(() => {
-        splash.classList.add('fade-out');
-        setTimeout(() => splash.remove(), 500);
-      });
-    }, 80); // 给浏览器 80ms 渲染窗口
+      // 侧边栏聊天列表逐条滑入
+      const chatList = document.getElementById('chatList');
+      if (chatList) {
+        chatList.querySelectorAll('.chat-item').forEach((item, i) => {
+          item.style.animationDelay = (i * 0.03) + 's';
+        });
+      }
+      splash.classList.add('fade-out');
+      setTimeout(() => splash.remove(), 500);
+    }, 100);
   },
 
   /* ---- 事件绑定 ---- */
@@ -4610,10 +4601,12 @@ const UIController = {
   /* ---- 占位方法（Task 8 实现） ---- */
   _renderMessages() {
     const chat = ChatManager.getCurrentChat();
+
+    // 使用 clone + 替换避免 innerHTML 清空造成的闪烁
+    const oldContent = this._dom.chatMessages.querySelectorAll('.msg-row');
     this._dom.chatMessages.innerHTML = '';
 
     if (!chat || chat.messages.length === 0) {
-      // innerHTML='' 会把 emptyState 从 DOM 移除，需要重新插入
       this._dom.chatMessages.appendChild(this._dom.emptyState);
       this._dom.emptyState.style.display = 'flex';
       this._dom.mainArea.classList.add('is-empty');
@@ -4624,30 +4617,31 @@ const UIController = {
     this._dom.mainArea.classList.remove('is-empty');
     const fragment = document.createDocumentFragment();
 
+    // 历史消息不加逐条动画，整体靠容器 fade-ready 淡入
     chat.messages.forEach((msg, idx) => {
-      const staggerDelay = (idx * 35) + 'ms';
       if (msg.role === 'user') {
-        const bubble = this._createUserBubble(msg);
-        bubble.style.animationDelay = staggerDelay;
-        fragment.appendChild(bubble);
+        fragment.appendChild(this._createUserBubble(msg));
       } else if (msg.role === 'assistant') {
         const prevIsAgent = idx > 0 && chat.messages[idx - 1].role === 'assistant';
         const nextIsAgent = idx < chat.messages.length - 1 && chat.messages[idx + 1].role === 'assistant';
-        // 头像只显示在连续Agent消息组的最后一段
         const showAvatar = !nextIsAgent;
-        const bubble = this._createAgentBubble(
+        fragment.appendChild(this._createAgentBubble(
           msg,
           idx === chat.messages.length - 1 && msg.content.includes('[响应中断]'),
           prevIsAgent,
           showAvatar
-        );
-        bubble.style.animationDelay = staggerDelay;
-        fragment.appendChild(bubble);
+        ));
       }
     });
 
+    // 先让容器透明，插入后再渐入
+    this._dom.chatMessages.style.opacity = '0';
     this._dom.chatMessages.appendChild(fragment);
     this._scrollToBottom();
+    requestAnimationFrame(() => {
+      this._dom.chatMessages.style.opacity = '';
+      this._dom.chatMessages.classList.add('fade-ready');
+    });
   },
 
   _createUserBubble(msg) {
