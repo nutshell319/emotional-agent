@@ -1983,6 +1983,75 @@ const EmotionTracker = {
 };
 
 /* ========================================
+   ContextReferencer — 话题回溯（移植自 human-persona）
+   ======================================== */
+const ContextReferencer = {
+  STOP_WORDS: new Set([
+    '的', '了', '是', '我', '你', 'TA', '他', '她', '它', '不', '也', '就', '都',
+    '还', '要', '有', '很', '吗', '呢', '吧', '啊', '哦', '嗯', '在', '和', '但',
+    '会', '能', '可以', '这个', '那个', '什么', '怎么', '为什么', '觉得', '知道',
+    '想', '说', '做', '来', '去', '一个', '真的', '其实', '就是', '还是',
+  ]),
+
+  /** 从文本提取关键词（>1个中文字，排除停用词） */
+  _extractKeywords(text) {
+    const words = text.match(/[一-鿿]{2,}/g) || [];
+    const seen = new Set();
+    const result = [];
+    for (const w of words) {
+      if (this.STOP_WORDS.has(w) || seen.has(w)) continue;
+      seen.add(w);
+      result.push(w);
+    }
+    return result;
+  },
+
+  /** 扫描历史消息，找与当前话题匹配的回溯点 */
+  findReference(chat, currentUserMsg) {
+    if (!chat || !chat.messages || chat.messages.length < 6) return null;
+
+    const currKeywords = this._extractKeywords(currentUserMsg);
+    if (currKeywords.length === 0) return null;
+
+    // 找历史用户消息（排除最近2条，往前最多20条）
+    const userMsgs = chat.messages.filter(m => m.role === 'user');
+    const historyStart = Math.max(0, userMsgs.length - 21);
+    const historyEnd = userMsgs.length - 3; // 排除最近2条
+
+    if (historyEnd < historyStart) return null;
+
+    let bestMatch = null;
+    let bestScore = 0;
+
+    for (let i = historyEnd; i >= historyStart; i--) {
+      const histKeywords = this._extractKeywords(userMsgs[i].content);
+      const overlap = currKeywords.filter(k => histKeywords.includes(k));
+      if (overlap.length > bestScore) {
+        bestScore = overlap.length;
+        const gap = userMsgs.length - 1 - i; // 距离当前消息的轮数
+        bestMatch = { keywords: overlap, gap: gap, snippet: userMsgs[i].content.slice(0, 50) };
+      }
+    }
+
+    // 至少2个关键词重叠 + 间隔>4轮才有回溯意义
+    if (!bestMatch || bestScore < 2 || bestMatch.gap <= 4) return null;
+
+    return bestMatch;
+  },
+
+  /** 生成回溯提示文本 */
+  getInjection(chat, currentUserMsg) {
+    const ref = this.findReference(chat, currentUserMsg);
+    if (!ref) return '';
+
+    const kw = ref.keywords.slice(0, 2).join('」「');
+    return '\n\n[话题回溯] 用户提到了「' + kw + '」，这个话题上次出现是在' + ref.gap +
+      '轮之前。如果聊天自然的话，你可以用你自己的语气接一句——比如"话说你之前说的那个...后来怎么样了？"。' +
+      '注意：如果当前对话已经有明确方向，不要强行回溯。只在自然过渡时才用。]';
+  },
+};
+
+/* ========================================
    SafetyGuard — 领域预检 + 危机检测
    ======================================== */
 const SafetyGuard = {
@@ -2852,6 +2921,15 @@ const ChatManager = {
       const evolution = EmotionTracker.getEvolution(chat);
       if (evolution) {
         context[0].content += '\n\n[情绪演化：' + evolution + '。根据情绪的变化趋势调整回复策略。]';
+      }
+
+      // 话题回溯注入（在历史中寻找与当前消息相关的话题）
+      if (chat.messages.length > 0) {
+        const lastUser = [...chat.messages].reverse().find(m => m.role === 'user');
+        if (lastUser) {
+          const refInjection = ContextReferencer.getInjection(chat, lastUser.content);
+          if (refInjection) context[0].content += refInjection;
+        }
       }
     }
 
