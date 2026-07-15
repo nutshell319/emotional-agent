@@ -373,6 +373,7 @@ input, textarea {
   transform-origin: left center;
   opacity: 0.25;
 }
+@keyframes lineIn { from { opacity: 0; } to { opacity: 0.25; } }
 .memory-float-hint {
   position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%);
   font-size: 10px; color: var(--text-muted);
@@ -4182,15 +4183,16 @@ const UIController = {
       positions.push({ ...f, angle, dist, i });
       const nx = cx + Math.cos(angle) * dist - 45;
       const ny = cy + Math.sin(angle) * dist - 12;
-      const delay = i * 0.04 + Math.random() * 0.06;
-      html += '<div class="memory-node ' + f.cat + '" style="left:' + nx + 'px;top:' + ny + 'px;animation-delay:' + delay.toFixed(2) + 's" title="' + f.content.replace(/"/g, '&quot;') + '" data-fact-id="' + (f.id || '') + '">' + f.content + '</div>';
+      const delay = (i * 0.05).toFixed(2);
+      html += '<div class="memory-node ' + f.cat + '" style="left:' + nx + 'px;top:' + ny + 'px;animation-delay:' + delay + 's" title="' + f.content.replace(/"/g, '&quot;') + '" data-fact-id="' + (f.id || '') + '">' + f.content + '</div>';
     });
 
-    // 第二遍：再渲染连线（连线端点在节点上方可见）
+    // 第二遍：渲染连线（与对应节点同步延迟，同起同落）
     positions.forEach((p) => {
       const lx = cx + Math.cos(p.angle) * 20;
       const ly = cy + Math.sin(p.angle) * 20;
-      html += '<div class="memory-line" style="left:' + lx + 'px;top:' + ly + 'px;width:' + (p.dist - 28) + 'px;transform:rotate(' + p.angle + 'rad)"></div>';
+      const delay = (p.i * 0.05).toFixed(2);
+      html += '<div class="memory-line" style="left:' + lx + 'px;top:' + ly + 'px;width:' + (p.dist - 28) + 'px;transform:rotate(' + p.angle + 'rad);animation:lineIn 0.4s ease ' + delay + 's both"></div>';
     });
 
     html += '<div class="memory-float-hint">点击节点可删除 · 点击空白处关闭</div>';
@@ -4222,7 +4224,7 @@ const UIController = {
     overlay.className = 'memory-float-overlay';
     overlay.id = 'memoryFloatOverlay';
     overlay.innerHTML = `
-      <div class="memory-float-panel" id="memoryFloatPanel">
+      <div class="memory-float-panel" id="memoryFloatPanel" style="visibility:hidden">
         <div class="memory-float-header">
           <h4>🧠 记忆脑图</h4>
           <button class="memory-float-close" id="memoryFloatClose">✕</button>
@@ -4231,9 +4233,15 @@ const UIController = {
       </div>`;
     document.body.appendChild(overlay);
 
-    // 触发打开动画
+    // 双帧确保初始状态已绘制，再触发过渡动画避免闪屏
     requestAnimationFrame(() => {
-      document.getElementById('memoryFloatPanel').classList.add('open');
+      requestAnimationFrame(() => {
+        const panel = document.getElementById('memoryFloatPanel');
+        if (panel) {
+          panel.style.visibility = 'visible';
+          panel.classList.add('open');
+        }
+      });
     });
 
     document.getElementById('memoryFloatClose').addEventListener('click', () => this._closeMemoryGraph());
