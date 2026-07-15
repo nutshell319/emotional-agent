@@ -332,6 +332,27 @@ input, textarea {
 .empty-text { font-size: 15px; }
 .empty-hint { font-size: 12px; opacity: 0.6; }
 
+/* 情绪温度指示器 */
+.mood-indicator {
+  display: flex; align-items: center; gap: 6px;
+  padding: 6px 16px;
+  font-size: 12px;
+  color: var(--text-dim);
+  border-bottom: 1px solid var(--card-border);
+  transition: all 0.5s ease;
+}
+.mood-dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  transition: background 0.5s ease;
+}
+.mood-indicator[data-mood="calm"] .mood-dot       { background: #6eb5a0; }
+.mood-indicator[data-mood="sad"] .mood-dot        { background: #7b8fce; }
+.mood-indicator[data-mood="angry"] .mood-dot      { background: #e85d75; }
+.mood-indicator[data-mood="anxious"] .mood-dot    { background: #d4a850; }
+.mood-indicator[data-mood="calming"] .mood-dot,
+.mood-indicator[data-mood="softening"] .mood-dot,
+.mood-indicator[data-mood="stabilizing"] .mood-dot { background: #8a9e8e; }
+
 .chat-input-area {
   padding: 14px 20px;
   border-top: 1px solid var(--card-border);
@@ -1147,6 +1168,10 @@ input, textarea {
       <span class="profile-hint-icon">💡</span>
       <span class="profile-hint-text">还没告诉我是谁 — </span>
       <button class="profile-hint-link" id="btnProfileHint">点这里设置TA的画像</button>
+    </div>
+    <div class="mood-indicator" id="moodIndicator" style="display:none">
+      <span class="mood-dot"></span>
+      <span class="mood-label">情绪平静</span>
     </div>
     <div class="chat-messages" id="chatMessages">
       <div class="empty-state" id="emptyState">
@@ -4233,6 +4258,7 @@ const UIController = {
         if (this._animId === animId) {
           this._dom.btnSend.disabled = false;
           this._dom.chatInput.focus();
+          this._updateMoodIndicator();
         }
       },
       onError: (err) => {
@@ -4548,6 +4574,25 @@ const UIController = {
   _getAgentAvatar() {
     const personaId = SettingsManager.getAll().persona || 'dushe';
     return (PERSONAS[personaId] || PERSONAS['dushe']).avatar;
+  },
+
+  /** 更新情绪温度指示器 */
+  _updateMoodIndicator() {
+    const indicator = document.getElementById('moodIndicator');
+    if (!indicator) return;
+    const chat = ChatManager.getCurrentChat();
+    if (!chat || chat.messages.length === 0) {
+      indicator.style.display = 'none';
+      return;
+    }
+    const state = EmotionTracker.getState(chat);
+    indicator.style.display = 'flex';
+    indicator.setAttribute('data-mood', state);
+    const labels = {
+      calm: '情绪平静', sad: '情绪低落', angry: '情绪激动', anxious: '焦虑不安',
+      calming: '难过在平复…', softening: '怒气在消退…', stabilizing: '焦虑在缓解…',
+    };
+    indicator.querySelector('.mood-label').textContent = labels[state] || state;
   },
 
   _updateApiStatus() {
