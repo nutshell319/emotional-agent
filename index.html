@@ -298,7 +298,7 @@ input, textarea {
   position: fixed;
   top: 50%; left: 50%;
   transform: translate(-50%, -50%) scale(0.9);
-  width: 580px; height: 460px;
+  width: 700px; height: 520px;
   background: var(--modal-bg);
   border: 1px solid var(--card-border);
   border-radius: 16px;
@@ -4157,31 +4157,37 @@ const UIController = {
       else categories.experience.push(f);
     });
 
-    // 分类簇布局：每类聚在一个扇区，内部松散随机偏移
-    const clusterAngles = { personality: -Math.PI * 0.45, behavior: Math.PI * 0.45, need: Math.PI * 0.9, experience: -Math.PI * 0.9 };
-    const w = 580, h = 420, cx = w / 2, cy = h / 2;
+    // 双层同心环布局：内环 + 外环，分类混排但间距充足，避免重叠
+    const w = 700, h = 470, cx = w / 2, cy = h / 2;
     let html = '<div class="memory-center-icon">🧠</div>';
-    const allNodes = [];
 
-    ['personality', 'behavior', 'need', 'experience'].forEach(cat => {
-      const baseAngle = clusterAngles[cat] || 0;
-      const nodes = categories[cat];
-      nodes.forEach((f, i) => {
-        // 簇内松散分布：角度在基础角 ±0.35 弧度内随机，半径在 70-180 间变化
-        const seed = (cat.charCodeAt(0) + i * 7) % 100 / 100;
-        const angle = baseAngle + (seed - 0.5) * 0.7;
-        const dist = 80 + seed * 100 + (i % 3) * 15;
-        const nx = cx + Math.cos(angle) * dist - 45;
-        const ny = cy + Math.sin(angle) * dist - 12;
-        const delay = (allNodes.length + i) * 0.05 + Math.random() * 0.1;
-        html += '<div class="memory-node ' + cat + '" style="left:' + nx + 'px;top:' + ny + 'px;animation-delay:' + delay.toFixed(2) + 's" title="' + f.content.replace(/"/g, '&quot;') + '" data-fact-id="' + (f.id || '') + '">' + f.content + '</div>';
-        // 连线从中心到节点
-        const lx = cx + Math.cos(angle) * 20;
-        const ly = cy + Math.sin(angle) * 20;
-        const lw = dist - 28;
-        html += '<div class="memory-line" style="left:' + lx + 'px;top:' + ly + 'px;width:' + lw + 'px;transform:rotate(' + angle + 'rad)"></div>';
-        allNodes.push({ ...f, cat });
-      });
+    // 收集所有节点并打乱分类顺序（看起来更自然）
+    const allNodes = [];
+    const catOrder = ['personality', 'behavior', 'need', 'experience'];
+    catOrder.forEach(cat => {
+      categories[cat].forEach(f => allNodes.push({ ...f, cat }));
+    });
+
+    // 分配到内外环：前半内环(r=100)，后半外环(r=170)
+    const innerCount = Math.ceil(allNodes.length / 2);
+    const innerR = 100, outerR = 170;
+
+    allNodes.forEach((f, i) => {
+      const onInner = i < innerCount;
+      const ringNodes = onInner ? innerCount : allNodes.length - innerCount;
+      const ringIdx = onInner ? i : i - innerCount;
+      const dist = onInner ? innerR : outerR;
+      // 均匀分布 + 微小随机偏移（±8°），避免僵硬但不会重叠
+      const jitter = (Math.random() - 0.5) * 0.25;
+      const angle = (ringIdx / ringNodes) * Math.PI * 2 - Math.PI / 2 + jitter;
+      const nx = cx + Math.cos(angle) * dist - 45;
+      const ny = cy + Math.sin(angle) * dist - 12;
+      const delay = i * 0.04 + Math.random() * 0.06;
+      html += '<div class="memory-node ' + f.cat + '" style="left:' + nx + 'px;top:' + ny + 'px;animation-delay:' + delay.toFixed(2) + 's" title="' + f.content.replace(/"/g, '&quot;') + '" data-fact-id="' + (f.id || '') + '">' + f.content + '</div>';
+      // 连线
+      const lx = cx + Math.cos(angle) * 20;
+      const ly = cy + Math.sin(angle) * 20;
+      html += '<div class="memory-line" style="left:' + lx + 'px;top:' + ly + 'px;width:' + (dist - 28) + 'px;transform:rotate(' + angle + 'rad)"></div>';
     });
 
     html += '<div class="memory-float-hint">点击节点可删除 · 点击空白处关闭</div>';
