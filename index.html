@@ -4123,18 +4123,27 @@ const UIController = {
         if (typing._thinkingTimer) { clearInterval(typing._thinkingTimer); typing._thinkingTimer = null; }
         typing.remove();
 
-        // 回复前随机停顿（300-900ms），模拟"看完消息→思考→开始打字"
-        const preDelay = 300 + Math.floor(Math.random() * 600);
+        // 回复前随机停顿（情绪感知：情绪越重、停顿越久），模拟真人思考时间
+        const emotionState = EmotionTracker.getState(ChatManager.getCurrentChat());
+        let preDelay;
+        if (emotionState === 'sad' || emotionState === 'anxious') {
+          preDelay = 600 + Math.floor(Math.random() * 600);  // 600-1200ms，情绪消息需要更多思考
+        } else if (emotionState === 'angry') {
+          preDelay = 400 + Math.floor(Math.random() * 400);  // 400-800ms，稍快表达共鸣
+        } else {
+          preDelay = 300 + Math.floor(Math.random() * 600);  // 300-900ms，默认
+        }
         await this._sleep(preDelay);
         if (this._animId !== animId) return;
 
         // 后台已分好段 → 逐段打字机效果 + 头像只在最新段显示
-        // 段间停顿根据下一段长度动态调整
+        // 段间停顿根据下一段长度动态调整（情绪感知：情绪消息附加犹豫延迟）
+        const moodBonus = (emotionState !== 'calm') ? 200 : 0;
         const getSegmentGap = (nextText) => {
           const len = (nextText || '').length;
-          if (len < 80) return 200 + Math.floor(Math.random() * 200);    // 200-400ms
-          if (len < 200) return 350 + Math.floor(Math.random() * 250);   // 350-600ms
-          return 500 + Math.floor(Math.random() * 400);                  // 500-900ms
+          if (len < 80) return 200 + Math.floor(Math.random() * 200) + moodBonus;
+          if (len < 200) return 350 + Math.floor(Math.random() * 250) + moodBonus;
+          return 500 + Math.floor(Math.random() * 400) + moodBonus;
         };
         let prevRow = null;
 
