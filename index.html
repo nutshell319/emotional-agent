@@ -2052,6 +2052,101 @@ const ContextReferencer = {
 };
 
 /* ========================================
+   StyleMemoryStore — 历史回复风格存储与检索（借鉴 Afterglow）
+   ======================================== */
+const StyleMemoryStore = {
+  STORAGE_KEY: 'emotion-agent:style-memory',
+  MAX_PER_PERSONA: 50,
+  MIN_LENGTH: 50, // 最短保存长度（太短没参考价值）
+
+  STOP_WORDS: new Set([
+    '的', '了', '是', '我', '你', 'TA', '他', '她', '不', '也', '就', '都', '还',
+    '要', '有', '很', '吗', '呢', '吧', '啊', '哦', '嗯', '在', '和', '但', '会',
+    '能', '可以', '这个', '那个', '什么', '怎么', '觉得', '知道', '想', '说', '来', '去',
+  ]),
+
+  _load() {
+    try {
+      return JSON.parse(localStorage.getItem(this.STORAGE_KEY)) || {};
+    } catch (_) { return {}; }
+  },
+
+  _save(data) {
+    try {
+      localStorage.setItem(this.STORAGE_KEY, JSON.stringify(data));
+    } catch (_) { /* localStorage 满了就静默失败 */ }
+  },
+
+  /** 从文本提取关键词 */
+  _extractKeywords(text) {
+    const words = text.match(/[一-鿿]{2,}/g) || [];
+    const freq = {};
+    for (const w of words) {
+      if (!this.STOP_WORDS.has(w)) freq[w] = (freq[w] || 0) + 1;
+    }
+    // 返回频率最高的前8个
+    return Object.entries(freq)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 8)
+      .map(e => e[0]);
+  },
+
+  /** 添加一条AI回复到风格记忆 */
+  add(responseText, personaId) {
+    if (!responseText || responseText.length < this.MIN_LENGTH) return;
+    const data = this._load();
+    if (!data[personaId]) data[personaId] = [];
+
+    const entry = {
+      text: responseText.slice(0, 200), // 只存前200字足够风格参考
+      keywords: this._extractKeywords(responseText),
+      ts: Date.now(),
+    };
+
+    data[personaId].push(entry);
+    // 每人格最多保留
+    if (data[personaId].length > this.MAX_PER_PERSONA) {
+      data[personaId] = data[personaId].slice(-this.MAX_PER_PERSONA);
+    }
+
+    this._save(data);
+  },
+
+  /** 检索风格相似的回复示例 */
+  query(userMsgKeywords, personaId) {
+    const data = this._load();
+    const memories = data[personaId] || [];
+    if (!memories.length || !userMsgKeywords.length) return [];
+
+    const scored = memories.map(m => {
+      const overlap = m.keywords.filter(k => userMsgKeywords.includes(k));
+      return { entry: m, score: overlap.length };
+    });
+
+    return scored
+      .filter(s => s.score >= 2)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 2)
+      .map(s => s.entry.text);
+  },
+
+  /** 生成风格注入文本 */
+  getStyleInjection(userMsg, personaId) {
+    const userKw = this._extractKeywords(userMsg);
+    if (!userKw.length) return '';
+
+    const examples = this.query(userKw, personaId);
+    if (!examples.length) return '';
+
+    let injection = '\n\n[风格参考] 下面是你在类似情境下的回复示例——仅参考风格节奏、语气和句式，不要直接复制内容：';
+    examples.forEach((ex, i) => {
+      injection += '\n- 示例' + (i + 1) + '：「' + ex + '」';
+    });
+    return injection;
+  },
+};
+
+/* ========================================
    SafetyGuard — 领域预检 + 危机检测
    ======================================== */
 const SafetyGuard = {
@@ -2929,6 +3024,11 @@ const ChatManager = {
         if (lastUser) {
           const refInjection = ContextReferencer.getInjection(chat, lastUser.content);
           if (refInjection) context[0].content += refInjection;
+
+          // 风格记忆 RAG 注入（检索类似情境下的历史回复作为风格参考）
+          const personaId = SettingsManager.getAll().persona || 'dushe';
+          const styleInjection = StyleMemoryStore.getStyleInjection(lastUser.content, personaId);
+          if (styleInjection) context[0].content += styleInjection;
         }
       }
     }
@@ -3059,6 +3159,10 @@ const ChatManager = {
             });
           });
           StorageManager.saveChat(chat);
+
+          // 保存风格记忆（用于后续回复的风格一致性 RAG）
+          const personaId = SettingsManager.getAll().persona || 'dushe';
+          StyleMemoryStore.add(fullResponse, personaId);
         }
         // 记忆提取
         const userMsgCount = chat.messages.filter(m => m.role === 'user').length;
@@ -3093,6 +3197,10 @@ const ChatManager = {
               });
             });
             StorageManager.saveChat(chat);
+
+            // 保存风格记忆（即使是部分响应也存）
+            const personaId = SettingsManager.getAll().persona || 'dushe';
+            StyleMemoryStore.add(fullResponse, personaId);
           }
           // 即使是错误，也展示已有的分段
           onAgentSegments(segments);
