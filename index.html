@@ -82,7 +82,7 @@ body::before {
 ::-webkit-scrollbar { width: 4px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 2px; }
-::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.15); }
+::-webkit-scrollbar-thumb:hover { background: var(--persona-color); opacity: 0.5; }
 
 /* ========================================
    Buttons & Inputs (base)
@@ -323,14 +323,37 @@ input, textarea {
   flex: 1;
   display: flex; flex-direction: column; align-items: center; justify-content: center;
   color: var(--text-muted);
-  gap: 12px;
+  gap: 20px;
   transition: opacity 0.3s ease;
+  padding: 20px;
 }
 .empty-state[style*="display: none"] { opacity: 0; }
-.empty-icon { font-size: 56px; opacity: 0.4; transition: opacity 0.3s ease; animation: floatIcon 3s ease-in-out infinite; }
-@keyframes floatIcon { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
-.empty-text { font-size: 15px; }
-.empty-hint { font-size: 12px; opacity: 0.6; }
+.empty-greeting { font-size: 15px; }
+.persona-cards {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  max-width: 360px;
+  width: 100%;
+}
+.persona-card {
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  padding: 16px 12px;
+  border-radius: 12px;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.persona-card:hover {
+  border-color: var(--persona-color);
+  background: var(--persona-glow);
+  transform: translateY(-2px);
+}
+.persona-card:active { transform: scale(0.97); }
+.persona-card-icon { font-size: 28px; }
+.persona-card-name { font-size: 13px; color: var(--text); font-weight: 600; }
+.persona-card-desc { font-size: 11px; opacity: 0.6; }
 
 /* 情绪温度指示器 */
 .mood-indicator {
@@ -586,14 +609,37 @@ input, textarea {
   margin-top: 2px;
 }
 @keyframes staggerBubbleIn {
-  from {
-    opacity: 0;
-    transform: translateY(18px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  from { opacity: 0; transform: translateY(18px) scale(0.95); }
+  60%  { opacity: 1; transform: translateY(-2px) scale(1.02); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* 右键上下文菜单 */
+.msg-context-menu {
+  position: fixed;
+  z-index: 999;
+  background: rgba(20,18,28,0.95);
+  border: 1px solid var(--card-border);
+  border-radius: 10px;
+  padding: 6px;
+  min-width: 140px;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  animation: contextIn 0.15s ease;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+}
+@keyframes contextIn { from { opacity: 0; transform: scale(0.92); } to { opacity: 1; transform: scale(1); } }
+.context-item {
+  padding: 8px 14px;
+  border-radius: 6px;
+  font-size: 13px;
+  color: var(--text-dim);
+  cursor: pointer;
+  transition: all 0.12s;
+}
+.context-item:hover {
+  background: var(--persona-glow);
+  color: var(--text);
 }
 
 /* Error bubble */
@@ -1175,9 +1221,29 @@ input, textarea {
     </div>
     <div class="chat-messages" id="chatMessages">
       <div class="empty-state" id="emptyState">
-        <div class="empty-icon">👧🏻</div>
-        <div class="empty-text">有什么想聊的？</div>
-        <div class="empty-hint">无论是感情困惑还是人际烦恼，我都在这里倾听</div>
+        <div class="empty-greeting">选一种方式开始聊天吧</div>
+        <div class="persona-cards" id="personaCards">
+          <div class="persona-card" data-persona="dushe">
+            <span class="persona-card-icon">👧🏻</span>
+            <span class="persona-card-name">毒舌闺蜜</span>
+            <span class="persona-card-desc">损友风格·嘴毒心软</span>
+          </div>
+          <div class="persona-card" data-persona="nuanxin">
+            <span class="persona-card-icon">🌸</span>
+            <span class="persona-card-name">暖心姐姐</span>
+            <span class="persona-card-desc">温柔耐心·共情陪伴</span>
+          </div>
+          <div class="persona-card" data-persona="junshi">
+            <span class="persona-card-icon">🧠</span>
+            <span class="persona-card-name">理性军师</span>
+            <span class="persona-card-desc">逻辑清晰·帮你想办法</span>
+          </div>
+          <div class="persona-card" data-persona="shudong">
+            <span class="persona-card-icon">🌙</span>
+            <span class="persona-card-name">温柔树洞</span>
+            <span class="persona-card-desc">安静倾听·不急着给建议</span>
+          </div>
+        </div>
       </div>
     </div>
     <div class="chat-input-area">
@@ -3457,6 +3523,89 @@ const UIController = {
         this._toggleSettings(false);
       }
     });
+
+    // 人格卡片点击 — 快速切换人格
+    document.querySelectorAll('.persona-card').forEach(card => {
+      card.addEventListener('click', () => {
+        const personaId = card.getAttribute('data-persona');
+        SettingsManager.set('persona', personaId);
+        this._updateBranding();
+        const p = PERSONAS[personaId];
+        this._showToast('已切换到「' + (p ? p.name : personaId) + '」人格', 'success');
+        this._dom.chatInput.focus();
+      });
+    });
+
+    // Agent 气泡右键菜单
+    this._dom.chatMessages.addEventListener('contextmenu', (e) => {
+      const bubble = e.target.closest('.msg-row.agent .msg-bubble');
+      if (!bubble) return;
+      e.preventDefault();
+      this._showContextMenu(e.clientX, e.clientY, bubble);
+    });
+  },
+
+  /** 右键上下文菜单 */
+  _showContextMenu(x, y, bubble) {
+    this._closeContextMenu();
+    const menu = document.createElement('div');
+    menu.className = 'msg-context-menu';
+    menu.id = 'contextMenu';
+    menu.innerHTML = `
+      <div class="context-item" data-action="copy">📋 复制</div>
+      <div class="context-item" data-action="regenerate">🔄 重新生成</div>`;
+    menu.style.left = x + 'px';
+    menu.style.top = y + 'px';
+    document.body.appendChild(menu);
+
+    menu.querySelector('[data-action="copy"]').addEventListener('click', () => {
+      const text = bubble.textContent || '';
+      navigator.clipboard.writeText(text).then(() => this._showToast('已复制', 'success'))
+        .catch(() => this._showToast('复制失败', 'error'));
+      this._closeContextMenu();
+    });
+
+    menu.querySelector('[data-action="regenerate"]').addEventListener('click', () => {
+      this._closeContextMenu();
+      const chat = ChatManager.getCurrentChat();
+      if (!chat) return;
+      // 找到气泡对应的那一轮对话
+      const bubbles = [...this._dom.chatMessages.querySelectorAll('.msg-row.agent .msg-bubble')];
+      const idx = bubbles.indexOf(bubble);
+      if (idx < 0) return;
+      // 找到对应的最后一条assistant消息，删除该轮
+      const msgs = chat.messages;
+      let foundIdx = -1;
+      for (let i = msgs.length - 1; i >= 0; i--) {
+        if (msgs[i].role === 'assistant') foundIdx = i;
+        if (msgs[i].role === 'user') {
+          const userContent = msgs[i].content;
+          // 删除该user及之后所有assistant消息
+          chat.messages = msgs.slice(0, i);
+          StorageManager.saveChat(chat);
+          this._renderMessages();
+          this._dom.chatInput.value = userContent;
+          this._dom.btnSend.classList.add('has-text');
+          this._dom.chatInput.focus();
+          this._send();
+          return;
+        }
+      }
+    });
+
+    // 点击菜单外关闭
+    const closeFn = (ev) => {
+      if (!menu.contains(ev.target)) {
+        this._closeContextMenu();
+        document.removeEventListener('click', closeFn);
+      }
+    };
+    setTimeout(() => document.addEventListener('click', closeFn), 0);
+  },
+
+  _closeContextMenu() {
+    const existing = document.getElementById('contextMenu');
+    if (existing) existing.remove();
   },
 
   /* ---- 侧边栏渲染 ---- */
@@ -4223,6 +4372,7 @@ const UIController = {
           const bubbleEl = row.querySelector('.msg-bubble');
           const cleaned = StyleVariator.vary(this._stripMarkdown(segments[i]));
           const len = cleaned.length;
+          bubbleEl.classList.add('streaming');
           for (let j = 0; j < len; j++) {
             if (this._animId !== animId) return;
             bubbleEl.textContent += cleaned[j];
@@ -4241,6 +4391,7 @@ const UIController = {
             }
             await this._sleep(speed);
           }
+          bubbleEl.classList.remove('streaming');
 
           prevRow = row;
         }
@@ -4565,9 +4716,6 @@ const UIController = {
     document.getElementById('sidebarLogoName').textContent = name;
     document.title = persona.icon + ' ' + name;
 
-    // 更新空状态图标
-    const emptyIcon = document.querySelector('.empty-icon');
-    if (emptyIcon) emptyIcon.textContent = persona.icon;
   },
 
   /** 获取当前人格的头像emoji */
