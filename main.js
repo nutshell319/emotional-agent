@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Menu } = require('electron');
+const { app, BrowserWindow, Menu, ipcMain } = require('electron');
 const path = require('path');
 
 let mainWindow = null;
@@ -16,11 +16,16 @@ function createWindow() {
       webSecurity: false,
       nodeIntegration: false,
       contextIsolation: true,
+      preload: path.join(__dirname, 'preload.js'),
     },
   });
 
   Menu.setApplicationMenu(null);
   mainWindow.loadFile('index.html');
+
+  ipcMain.on('maximize-window', () => {
+    if (mainWindow) mainWindow.maximize();
+  });
 
   mainWindow.on('closed', () => {
     mainWindow = null;

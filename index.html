@@ -3783,6 +3783,10 @@ const UIController = {
     if (!splash) return;
     setTimeout(() => {
       splash.classList.add('fade-out');
+      // 引导屏淡出后触发平滑全屏
+      if (window.electronAPI) {
+        setTimeout(() => window.electronAPI.maximize(), 300);
+      }
       setTimeout(() => splash.remove(), 550);
     }, 1000); // 延迟到窗口 show() 之后，确保用户看到的是完整遮罩
   },
