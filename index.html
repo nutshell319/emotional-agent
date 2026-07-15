@@ -298,7 +298,7 @@ input, textarea {
   position: fixed;
   top: 50%; left: 50%;
   transform: translate(-50%, -50%) scale(0.9);
-  width: 700px; height: 520px;
+  width: 820px; height: 560px;
   background: var(--modal-bg);
   border: 1px solid var(--card-border);
   border-radius: 16px;
@@ -369,9 +369,9 @@ input, textarea {
 .memory-line {
   position: absolute;
   height: 1px;
-  background: var(--card-border);
+  background: var(--persona-color);
   transform-origin: left center;
-  opacity: 0.3;
+  opacity: 0.25;
 }
 .memory-float-hint {
   position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%);
@@ -4158,19 +4158,17 @@ const UIController = {
     });
 
     // 双层同心环布局：内环 + 外环，分类混排但间距充足，避免重叠
-    const w = 700, h = 470, cx = w / 2, cy = h / 2;
+    const w = 820, h = 510, cx = w / 2, cy = h / 2;
     let html = '<div class="memory-center-icon">🧠</div>';
 
-    // 收集所有节点并打乱分类顺序（看起来更自然）
     const allNodes = [];
     const catOrder = ['personality', 'behavior', 'need', 'experience'];
     catOrder.forEach(cat => {
       categories[cat].forEach(f => allNodes.push({ ...f, cat }));
     });
 
-    // 分配到内外环：前半内环(r=100)，后半外环(r=170)
     const innerCount = Math.ceil(allNodes.length / 2);
-    const innerR = 100, outerR = 170;
+    const innerR = 130, outerR = 210;
 
     allNodes.forEach((f, i) => {
       const onInner = i < innerCount;
