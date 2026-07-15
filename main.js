@@ -9,7 +9,7 @@ function createWindow() {
     height: 600,
     minWidth: 720,
     minHeight: 450,
-    show: false,  // 先隐藏，等最大化完成后再显示，避免窗口缩放闪烁
+    backgroundColor: '#08090d',  // 与暗色主题背景一致，消除窗口出现时的白闪
     title: 'Warmth',
     icon: path.join(__dirname, 'icon.ico'),
     webPreferences: {
@@ -22,11 +22,6 @@ function createWindow() {
   Menu.setApplicationMenu(null);
   mainWindow.loadFile('index.html');
   mainWindow.maximize();
-
-  // 最大化完成后再显示窗口
-  mainWindow.once('ready-to-show', () => {
-    mainWindow.show();
-  });
 
   mainWindow.on('closed', () => {
     mainWindow = null;
