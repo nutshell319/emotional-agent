@@ -142,6 +142,13 @@ html, body {
 }
 .main-layout.ready { opacity: 1; }
 
+/* 聊天区加载淡入 */
+.chat-messages {
+  opacity: 0;
+  transition: opacity 0.35s ease;
+}
+.chat-messages.fade-ready { opacity: 1; }
+
 /* 背景纹理 */
 body::before {
   content: '';
@@ -3755,19 +3762,28 @@ const UIController = {
     const savedTheme = SettingsManager.getAll().theme || 'dark';
     this._applyTheme(savedTheme);
 
-    // 加载完成后淡出引导屏 + 渐入主界面
+    // 等待聊天区渲染完成后再淡出引导屏
+    this._finishSplash();
+  },
+
+  _finishSplash() {
     const splash = document.getElementById('splashScreen');
-    if (splash) {
-      // 先让主界面就绪（仍不可见），再淡出引导屏
+    if (!splash) return;
+    // 等三帧确保 DOM 已绘制完毕
+    requestAnimationFrame(() => {
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
           const app = document.getElementById('app');
+          const chatMsgs = document.getElementById('chatMessages');
+          // 聊天区先淡入
+          if (chatMsgs) chatMsgs.classList.add('fade-ready');
           if (app) app.classList.add('ready');
+          // 引导屏随后淡出
           splash.classList.add('fade-out');
-          setTimeout(() => splash.remove(), 450);
+          setTimeout(() => splash.remove(), 500);
         });
       });
-    }
+    });
   },
 
   /* ---- 事件绑定 ---- */
