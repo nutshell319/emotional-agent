@@ -298,7 +298,7 @@ input, textarea {
   position: fixed;
   top: 50%; left: 50%;
   transform: translate(-50%, -50%) scale(0.9);
-  width: 440px; height: 380px;
+  width: 580px; height: 460px;
   background: var(--modal-bg);
   border: 1px solid var(--card-border);
   border-radius: 16px;
@@ -4157,24 +4157,31 @@ const UIController = {
       else categories.experience.push(f);
     });
 
-    const allNodes = [];
-    ['personality', 'behavior', 'need', 'experience'].forEach(cat => {
-      categories[cat].forEach(f => allNodes.push({ ...f, cat }));
-    });
-
-    const w = 440, h = 320, cx = w / 2, cy = h / 2, r = 120;
+    // 分类簇布局：每类聚在一个扇区，内部松散随机偏移
+    const clusterAngles = { personality: -Math.PI * 0.45, behavior: Math.PI * 0.45, need: Math.PI * 0.9, experience: -Math.PI * 0.9 };
+    const w = 580, h = 420, cx = w / 2, cy = h / 2;
     let html = '<div class="memory-center-icon">🧠</div>';
+    const allNodes = [];
 
-    allNodes.forEach((f, i) => {
-      const angle = (i / allNodes.length) * Math.PI * 2 - Math.PI / 2;
-      const nx = cx + Math.cos(angle) * r - 45;
-      const ny = cy + Math.sin(angle) * r - 12;
-      const delay = i * 0.06;
-      html += '<div class="memory-node ' + f.cat + '" style="left:' + nx + 'px;top:' + ny + 'px;animation-delay:' + delay + 's" title="' + f.content.replace(/"/g, '&quot;') + '" data-fact-id="' + (f.id || '') + '">' + f.content + '</div>';
-      const la = (i / allNodes.length) * Math.PI * 2 - Math.PI / 2;
-      const lx = cx + Math.cos(la) * 20;
-      const ly = cy + Math.sin(la) * 20;
-      html += '<div class="memory-line" style="left:' + lx + 'px;top:' + ly + 'px;width:' + (r - 28) + 'px;transform:rotate(' + la + 'rad)"></div>';
+    ['personality', 'behavior', 'need', 'experience'].forEach(cat => {
+      const baseAngle = clusterAngles[cat] || 0;
+      const nodes = categories[cat];
+      nodes.forEach((f, i) => {
+        // 簇内松散分布：角度在基础角 ±0.35 弧度内随机，半径在 70-180 间变化
+        const seed = (cat.charCodeAt(0) + i * 7) % 100 / 100;
+        const angle = baseAngle + (seed - 0.5) * 0.7;
+        const dist = 80 + seed * 100 + (i % 3) * 15;
+        const nx = cx + Math.cos(angle) * dist - 45;
+        const ny = cy + Math.sin(angle) * dist - 12;
+        const delay = (allNodes.length + i) * 0.05 + Math.random() * 0.1;
+        html += '<div class="memory-node ' + cat + '" style="left:' + nx + 'px;top:' + ny + 'px;animation-delay:' + delay.toFixed(2) + 's" title="' + f.content.replace(/"/g, '&quot;') + '" data-fact-id="' + (f.id || '') + '">' + f.content + '</div>';
+        // 连线从中心到节点
+        const lx = cx + Math.cos(angle) * 20;
+        const ly = cy + Math.sin(angle) * 20;
+        const lw = dist - 28;
+        html += '<div class="memory-line" style="left:' + lx + 'px;top:' + ly + 'px;width:' + lw + 'px;transform:rotate(' + angle + 'rad)"></div>';
+        allNodes.push({ ...f, cat });
+      });
     });
 
     html += '<div class="memory-float-hint">点击节点可删除 · 点击空白处关闭</div>';
