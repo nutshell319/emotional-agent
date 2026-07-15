@@ -1,12 +1,13 @@
-const { app, BrowserWindow, Menu } = require('electron');
+const { app, BrowserWindow, Menu, screen } = require('electron');
 const path = require('path');
 
 let mainWindow = null;
 
 function createWindow() {
+  const { width, height } = screen.getPrimaryDisplay().workAreaSize;
+
   mainWindow = new BrowserWindow({
-    width: 960,
-    height: 600,
+    width, height,
     minWidth: 720,
     minHeight: 450,
     backgroundColor: '#08090d',
@@ -21,7 +22,6 @@ function createWindow() {
 
   Menu.setApplicationMenu(null);
   mainWindow.loadFile('index.html');
-  mainWindow.maximize();
 
   mainWindow.on('closed', () => {
     mainWindow = null;
