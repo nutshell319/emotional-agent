@@ -1772,6 +1772,83 @@ const EmotionTracker = {
     return injections[mood] || '';
   },
 
+  /** 多维情绪向量检测 — 返回4维归一化得分（借鉴 Anthropomorphic-Agent-Engine） */
+  detectVector(chat, lookback = 3) {
+    if (!chat || !chat.messages) return { sad: 0, angry: 0, anxious: 0, calm: 1 };
+
+    const userMsgs = chat.messages
+      .filter(m => m.role === 'user')
+      .slice(-lookback)
+      .map(m => m.content);
+
+    if (userMsgs.length === 0) return { sad: 0, angry: 0, anxious: 0, calm: 1 };
+
+    const scores = { sad: 0, angry: 0, anxious: 0 };
+    for (const msg of userMsgs) {
+      for (const [mood, words] of Object.entries(this.keywords)) {
+        for (const word of words) {
+          if (msg.includes(word)) scores[mood] = (scores[mood] || 0) + 1;
+        }
+      }
+    }
+
+    // 归一化：每类命中数 / (该类关键词总数 × lookback消息数)
+    const totalMsgs = userMsgs.length;
+    const sadLen = this.keywords.sad.length;
+    const angryLen = this.keywords.angry.length;
+    const anxiousLen = this.keywords.anxious.length;
+
+    const normalized = {
+      sad: Math.min(1, scores.sad / (sadLen * totalMsgs)),
+      angry: Math.min(1, scores.angry / (angryLen * totalMsgs)),
+      anxious: Math.min(1, scores.anxious / (anxiousLen * totalMsgs)),
+    };
+    // calm = 1 - max(其他维度)
+    const maxOther = Math.max(normalized.sad, normalized.angry, normalized.anxious);
+    normalized.calm = Math.max(0, 1 - maxOther);
+
+    return normalized;
+  },
+
+  /** 根据向量生成混合情绪 Prompt 注入 */
+  getVectorInjection(vec) {
+    const active = [];
+    if (vec.sad > 0.05) active.push({ mood: '难过', score: vec.sad });
+    if (vec.angry > 0.05) active.push({ mood: '愤怒', score: vec.angry });
+    if (vec.anxious > 0.05) active.push({ mood: '焦虑', score: vec.anxious });
+
+    if (active.length === 0) return '';
+
+    active.sort((a, b) => b.score - a.score);
+
+    if (active.length === 1) {
+      // 单一情绪
+      const m = active[0].mood;
+      const injections = {
+        '难过': '对方现在情绪低落，第一句话先共情和陪伴，不要急着分析和给建议。语气温柔一点。',
+        '愤怒': '对方现在很生气，先认可TA的情绪——"确实气人""换谁谁不气"——然后再帮TA理性分析。别泼冷水火上浇油。',
+        '焦虑': '对方现在很焦虑，你给的建议要比平时更具体和确定，少用反问和留白，多用"我觉得你可以…"的明确指引来帮TA稳住。',
+      };
+      return '\n\n[情绪感知：' + injections[m] + ']';
+    }
+
+    // 混合情绪
+    const main = active[0].mood;
+    const sub = active[1].mood;
+    const mixDescriptions = {
+      '难过+焦虑': '对方主要是难过，混合了一些焦虑——可能是在为未来担心。先接住难过，再温和地问TA在担心什么。',
+      '难过+愤怒': '对方又难过又生气——难过的底下可能是愤怒。先认可TA的委屈感，等情绪稳一点再帮TA理清愤怒的来源。',
+      '愤怒+焦虑': '对方表面上在生气，但底层可能是焦虑。不要被愤怒的表面带偏——帮TA看到自己在怕什么。',
+      '焦虑+难过': '对方主要是焦虑，但也有些难过。焦虑的人需要确定性——给TA具体的、能落地的建议，同时别忽略TA的失落感。',
+      '焦虑+愤怒': '对方焦虑又愤怒——这种组合通常意味着"被困住了"。帮TA先看清最急迫的问题是什么，别让TA被多重压力压垮。',
+      '愤怒+难过': '对方又气又难过——愤怒可能是难过的保护色。先认可TA的愤怒是合理的，再温和地触碰下面的难过。',
+    };
+    const key = main + '+' + sub;
+    const desc = mixDescriptions[key] || ('对方主要是' + main + '，但也有些' + sub + '。先回应主导情绪，也留心混合情绪的复杂性。');
+
+    return '\n\n[情绪感知（混合）：' + desc + ']';
+  },
+
   /** 情绪标签和严重程度映射 */
   MOOD_LABELS: { sad: '难过', angry: '愤怒', anxious: '焦虑', calm: '平静' },
   MOOD_SEVERITY: { calm: 0, anxious: 1, sad: 2, angry: 3 },
@@ -1826,6 +1903,82 @@ const EmotionTracker = {
     } else {
       return '情绪持续' + currLabel + '中，和上一条消息状态差不多';
     }
+  },
+
+  /** 情绪状态机 — 返回带惯性的情绪状态（移植自 human-persona + FEMA） */
+  getState(chat) {
+    if (!chat) return 'calm';
+
+    const vec = this.detectVector(chat);
+    const dominant = Object.entries({ sad: vec.sad, angry: vec.angry, anxious: vec.anxious })
+      .sort((a, b) => b[1] - a[1])[0];
+    const detectedMood = dominant[1] > 0.03 ? dominant[0] : 'calm';
+
+    // 过渡态映射
+    const TRANSITIONS = {
+      sad: 'calming', angry: 'softening', anxious: 'stabilizing',
+    };
+
+    // 初始化或获取上一次状态
+    if (!chat._emotionState) {
+      chat._emotionState = { state: detectedMood, streak: 1 };
+      return detectedMood;
+    }
+
+    const prev = chat._emotionState;
+
+    if (detectedMood === 'calm') {
+      // 从激烈情绪 → calm：进入过渡态
+      if (prev.state === 'sad' || prev.state === 'angry' || prev.state === 'anxious') {
+        const transition = TRANSITIONS[prev.state];
+        chat._emotionState = { state: transition, streak: 1 };
+        return transition;
+      }
+      // 过渡态持续 → calm
+      if (prev.state === 'calming' || prev.state === 'softening' || prev.state === 'stabilizing') {
+        if (prev.streak >= 2) {
+          chat._emotionState = { state: 'calm', streak: 1 };
+          return 'calm';
+        }
+        chat._emotionState = { state: prev.state, streak: prev.streak + 1 };
+        return prev.state;
+      }
+      // 一直 calm
+      chat._emotionState = { state: 'calm', streak: prev.streak + 1 };
+      return 'calm';
+    }
+
+    // 检测到激烈情绪
+    if (detectedMood === prev.state) {
+      // 持续同一种情绪
+      chat._emotionState = { state: detectedMood, streak: prev.streak + 1 };
+      return detectedMood;
+    }
+
+    // 反弹：过渡态 → 激烈情绪（直接跳回，不经过渡）
+    if ((prev.state === 'calming' || prev.state === 'softening' || prev.state === 'stabilizing') &&
+        (detectedMood === 'sad' || detectedMood === 'angry' || detectedMood === 'anxious')) {
+      chat._emotionState = { state: detectedMood, streak: 1 };
+      return detectedMood;
+    }
+
+    // 不同激烈情绪切换：直接切换（愤怒变难过等）
+    chat._emotionState = { state: detectedMood, streak: 1 };
+    return detectedMood;
+  },
+
+  /** 根据状态机输出生成 Prompt 注入 */
+  getStateInjection(state) {
+    const injections = {
+      sad: '对方现在情绪低落，第一句话先共情和陪伴，不要急着分析和给建议。语气温柔一点。',
+      angry: '对方现在很生气，先认可TA的情绪——"确实气人""换谁谁不气"——然后再帮TA理性分析。别泼冷水火上浇油。',
+      anxious: '对方现在很焦虑，你给的建议要比平时更具体和确定，少用反问和留白，多用"我觉得你可以…"的明确指引来帮TA稳住。',
+      calming: '对方的难过在慢慢平复，但还没有完全走出来。不要太快切换话题或语气——继续保持温柔和耐心的陪伴，可以比刚才稍微轻松一点点。',
+      softening: '对方的愤怒在慢慢消退，但余怒未消。不要急着"翻篇"或开玩笑，继续保持理解和认可的态度。可以开始帮TA理性复盘了。',
+      stabilizing: '对方的焦虑在缓解，但还有些不安。给TA一些确定的、积极的信号——"你看，事情没有你想的那么糟"。可以开始帮TA建立掌控感。',
+    };
+    if (!injections[state]) return '';
+    return '\n\n[情绪状态：' + injections[state] + ']';
   },
 };
 
@@ -2680,11 +2833,19 @@ const ChatManager = {
       sceneText += ']';
       context[0].content += sceneText;
 
-      // 情感状态追踪注入（在场景描述之后，帮助模型调整回复基调）
-      const mood = EmotionTracker.detect(chat);
-      const moodInjection = EmotionTracker.getInjection(mood);
-      if (moodInjection) {
-        context[0].content += moodInjection;
+      // 情感状态追踪注入（状态机 + 多维向量 + 情绪惯性）
+      const emotionState = EmotionTracker.getState(chat);
+      const stateInjection = EmotionTracker.getStateInjection(emotionState);
+      if (stateInjection) {
+        context[0].content += stateInjection;
+      }
+
+      // 补充多维向量注入（混合情绪详情）
+      const emotionVec = EmotionTracker.detectVector(chat);
+      const vecInjection = EmotionTracker.getVectorInjection(emotionVec);
+      if (vecInjection && emotionState === 'calm') {
+        // 状态机判为calm但向量检测到混合情绪 → 用向量补充
+        context[0].content += vecInjection;
       }
 
       // 情绪演化注入（比较最近两条消息的情绪变化趋势）
