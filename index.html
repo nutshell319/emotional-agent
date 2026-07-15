@@ -604,6 +604,16 @@ input, textarea {
   50% { transform: scale(1.06); }
 }
 
+/* 思考文案淡入淡出 */
+.thinking-text {
+  font-size: 12px;
+  color: var(--text-dim);
+  margin-right: 4px;
+  opacity: 0;
+  transition: opacity 0.4s ease;
+}
+.thinking-text.show { opacity: 1; }
+
 /* "继续"按钮（中断补全） */
 .continue-hint {
   display: inline-flex; align-items: center; gap: 4px;
@@ -3187,11 +3197,36 @@ const UIController = {
       <div class="msg-avatar">👧🏻</div>
       <div class="msg-content">
         <div class="msg-bubble">
+          <span class="thinking-text"></span>
           <span class="thinking-dot"></span>
           <span class="thinking-dot"></span>
           <span class="thinking-dot"></span>
         </div>
       </div>`;
+
+    // 随机思考文案轮播（每1.5秒切换，带淡入淡出）
+    const texts = [
+      '正在理解你的感受…',
+      '让我想想…',
+      '在打字了…',
+      '嗯，我想说…',
+      '让我组织一下语言…',
+      '这事儿得好好想想…',
+    ];
+    const textEl = row.querySelector('.thinking-text');
+    let idx = Math.floor(Math.random() * texts.length);
+    textEl.textContent = texts[idx];
+    textEl.classList.add('show');
+
+    row._thinkingTimer = setInterval(() => {
+      textEl.classList.remove('show');
+      setTimeout(() => {
+        idx = (idx + 1) % texts.length;
+        textEl.textContent = texts[idx];
+        textEl.classList.add('show');
+      }, 400); // 等淡出完成再切换文案
+    }, 1500);
+
     return row;
   },
 
@@ -3284,7 +3319,8 @@ const UIController = {
         this._dom.chatTitle.textContent = ChatManager.getCurrentChat()?.title || '新对话';
       },
       onAgentSegments: async (segments) => {
-        // 移除思考动画
+        // 清除思考文案轮播定时器 + 移除思考动画
+        if (typing._thinkingTimer) { clearInterval(typing._thinkingTimer); typing._thinkingTimer = null; }
         typing.remove();
 
         // 后台已分好段 → 逐段打字机效果 + 头像只在最新段显示
@@ -3347,6 +3383,7 @@ const UIController = {
         }
       },
       onError: (err) => {
+        if (typing._thinkingTimer) { clearInterval(typing._thinkingTimer); typing._thinkingTimer = null; }
         typing.remove();
         this._dom.btnSend.disabled = false;
 
@@ -3370,6 +3407,7 @@ const UIController = {
         this._scrollToBottom();
       },
       onReject: (message) => {
+        if (typing._thinkingTimer) { clearInterval(typing._thinkingTimer); typing._thinkingTimer = null; }
         typing.remove();
         this._dom.btnSend.disabled = false;
         this._dom.chatInput.focus();
@@ -3404,10 +3442,12 @@ const UIController = {
     this._dom.chatMessages.appendChild(typing);
 
     ChatManager.retryLast().then(() => {
+      if (typing._thinkingTimer) { clearInterval(typing._thinkingTimer); typing._thinkingTimer = null; }
       typing.remove();
       this._dom.btnSend.disabled = false;
       this._renderMessages();
     }).catch((err) => {
+      if (typing._thinkingTimer) { clearInterval(typing._thinkingTimer); typing._thinkingTimer = null; }
       typing.remove();
       this._dom.btnSend.disabled = false;
       this._showToast(err.userMessage || err.message, 'error');
