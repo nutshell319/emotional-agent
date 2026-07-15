@@ -1242,6 +1242,85 @@ function stripMarkdown(text) {
 }
 
 /* ========================================
+   StyleVariator — 回复文本自然变异（移植自 human-persona）
+   ======================================== */
+const StyleVariator = {
+  /** 对AI回复文本引入自然的"毛边"，让它读起来不像机器写的 */
+  vary(text) {
+    if (!text || text.length < 15) return text; // 太短不处理
+
+    const rules = [
+      () => { // 句首填充：偶尔在开头加口语化前缀（5%）
+        if (Math.random() > 0.05) return text;
+        const fillers = ['嗯…', '呃，', '怎么说呢，', '唔…'];
+        const f = fillers[Math.floor(Math.random() * fillers.length)];
+        return f + text.charAt(0).toLowerCase() + text.slice(1);
+      },
+      () => { // 标点软化：随机换一个句号为~或…（3%）
+        if (Math.random() > 0.03) return text;
+        const periods = [...text.matchAll(/。(?!\s*$)/g)]; // 不在结尾的句号
+        if (!periods.length) return text;
+        const picked = periods[Math.floor(Math.random() * periods.length)];
+        const soft = Math.random() < 0.5 ? '~' : '…';
+        return text.slice(0, picked.index) + soft + text.slice(picked.index + 1);
+      },
+      () => { // 口语词注入：陈述句末尾加语气词（4%）
+        if (Math.random() > 0.04) return text;
+        const sentences = text.split(/(?<=[。！？~…])/);
+        if (sentences.length < 2) return text;
+        const idx = Math.floor(Math.random() * (sentences.length - 1)); // 不在最后一句
+        const s = sentences[idx];
+        if (s.length < 5) return text;
+        const particles = ['嘛', '啦', '吧'];
+        const p = particles[Math.floor(Math.random() * particles.length)];
+        sentences[idx] = s.replace(/([。！？~…])$/, p + '$1');
+        return sentences.join('');
+      },
+      () => { // 标点长度变化：。→…… 或 ！→！！（5%）
+        if (Math.random() > 0.05) return text;
+        if (Math.random() < 0.5) {
+          // 随机把一个句号变省略号
+          const periods = [...text.matchAll(/。(?!\s*$)/g)];
+          if (periods.length) {
+            const p = periods[Math.floor(Math.random() * periods.length)];
+            return text.slice(0, p.index) + '……' + text.slice(p.index + 1);
+          }
+        } else {
+          // 随机把一个感叹号变双感叹号
+          const excl = text.indexOf('！');
+          if (excl > -1 && excl < text.length - 1) {
+            return text.slice(0, excl) + '！！' + text.slice(excl + 1);
+          }
+        }
+        return text;
+      },
+      () => { // 长消息停顿：>60字的消息在句中随机插入…（3%）
+        if (text.length < 60 || Math.random() > 0.03) return text;
+        const mid = Math.floor(text.length * 0.3 + Math.random() * text.length * 0.4);
+        // 避开标点位置
+        const punct = '。！？~…，、\n';
+        if (punct.includes(text[mid])) return text;
+        return text.slice(0, mid) + '…' + text.slice(mid);
+      },
+    ];
+
+    // 打乱规则顺序，最多触发2条
+    const shuffled = rules.sort(() => Math.random() - 0.5);
+    let result = text;
+    let triggered = 0;
+    for (const rule of shuffled) {
+      if (triggered >= 2) break;
+      const modified = rule.call(this, result);
+      if (modified !== result) {
+        result = modified;
+        triggered++;
+      }
+    }
+    return result;
+  },
+};
+
+/* ========================================
    SettingsManager — API配置的读写
    ======================================== */
 const SettingsManager = {
@@ -3734,7 +3813,7 @@ const UIController = {
 
           // 打字机逐字输出（三段式变速：慢-快-慢，模拟真人打字节奏）
           const bubbleEl = row.querySelector('.msg-bubble');
-          const cleaned = this._stripMarkdown(segments[i]);
+          const cleaned = StyleVariator.vary(this._stripMarkdown(segments[i]));
           const len = cleaned.length;
           for (let j = 0; j < len; j++) {
             if (this._animId !== animId) return;
