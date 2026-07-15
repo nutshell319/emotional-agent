@@ -3807,7 +3807,7 @@ const UIController = {
         console.log('[UI] splash removed +' + (performance.now() - t0).toFixed(0) + 'ms');
         splash.remove();
       }, 550);
-    }, 200);
+    }, 1000); // 延迟到窗口 show() 之后，确保用户看到的是完整遮罩
   },
 
   /* ---- 事件绑定 ---- */
