@@ -134,18 +134,9 @@ html, body {
   30% { transform: translateY(-8px) scale(1.15); opacity: 1; }
 }
 
-/* 主界面初始隐藏，引导屏结束后渐入 */
-.main-layout {
-  opacity: 0;
-  background: var(--bg);
-  transition: opacity 0.4s ease, background 0.4s ease, color 0.4s ease;
-}
-.main-layout.ready { opacity: 1; }
 
 /* 聊天区加载淡入 */
-.chat-messages.fade-ready { opacity: 1; }
-
-/* 聊天记录加载提示（独立于聊天区，不受其 opacity 影响） */
+/* 聊天记录加载提示 */
 .chat-loading-hint {
   position: absolute; top: 50%; left: 50%;
   transform: translate(-50%, -50%);
@@ -1463,7 +1454,7 @@ input, textarea {
 
 <div class="toast-container" id="toastContainer"></div>
 
-<div id="app" class="main-layout">
+<div id="app">
   <!-- 侧边栏 -->
   <aside class="sidebar" id="sidebar">
     <div class="sidebar-header">
@@ -3793,20 +3784,11 @@ const UIController = {
   _finishSplash() {
     const splash = document.getElementById('splashScreen');
     if (!splash) return;
-    // 让浏览器先完成首次绘制（聊天区已由 _renderMessages 控制淡入）
+    // setTimeout 确保浏览器已绘制完 DOM，再淡出引导屏
     setTimeout(() => {
-      const app = document.getElementById('app');
-      if (app) app.classList.add('ready');
-      // 侧边栏聊天列表逐条滑入
-      const chatList = document.getElementById('chatList');
-      if (chatList) {
-        chatList.querySelectorAll('.chat-item').forEach((item, i) => {
-          item.style.animationDelay = (i * 0.03) + 's';
-        });
-      }
       splash.classList.add('fade-out');
       setTimeout(() => splash.remove(), 500);
-    }, 100);
+    }, 150);
   },
 
   /* ---- 事件绑定 ---- */
