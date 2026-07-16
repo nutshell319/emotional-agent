@@ -5199,6 +5199,7 @@ const UIController = {
         const count = await StorageManager.importJSON(file);
         this._showToast(`成功导入 ${count} 个新会话`, 'success');
         this._renderSidebar();
+        this._renderUserProfileCard(); // 导入后刷新用户画像+脑图计数
         this._loadLastChat();
       } catch (err) {
         this._showToast(err.message, 'error');
