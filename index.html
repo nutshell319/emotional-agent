@@ -1889,18 +1889,18 @@ const StorageManager = {
           if (data.userMemory && data.userMemory.facts) {
             // 导入用户记忆，与现有记忆合并
             UserMemoryManager.mergeFacts(data.userMemory.facts || []);
-            if (data.userMemory.name) {
-              const existing = UserMemoryManager.get();
-              if (!existing.name) {
-                UserMemoryManager.updateProfile({
-                  name: data.userMemory.name,
-                  mbti: data.userMemory.mbti || '',
-                  zodiac: data.userMemory.zodiac || '',
-                  age: data.userMemory.age || '',
-                  personality: data.userMemory.personality || '',
-                  notes: data.userMemory.notes || '',
-                });
-              }
+            // 导入用户画像字段（备份恢复时始终覆盖，包括gender）
+            const um = data.userMemory;
+            if (um.name) {
+              UserMemoryManager.updateProfile({
+                name: um.name,
+                gender: um.gender || '',
+                mbti: um.mbti || '',
+                zodiac: um.zodiac || '',
+                age: um.age || '',
+                personality: um.personality || '',
+                notes: um.notes || '',
+              });
             }
           }
           resolve(newChats.length);
