@@ -97,17 +97,14 @@ html, body {
   line-height: 1.6;
 }
 
-    /* 主题切换全局过渡动画（仅在手动切换时启用，启动跳过避免闪烁） */
+    /* 主题切换全局过渡动画（仅手动切换时启用；不用!important，通配符最低优先级作为fallback） */
     html.theme-transitioning,
     html.theme-transitioning *,
     html.theme-transitioning *::before,
     html.theme-transitioning *::after {
-      transition: background-color 0.5s cubic-bezier(0.4, 0, 0.2, 1),
-                  color 0.4s cubic-bezier(0.4, 0, 0.2, 1),
-                  border-color 0.5s cubic-bezier(0.4, 0, 0.2, 1),
-                  box-shadow 0.5s cubic-bezier(0.4, 0, 0.2, 1),
-                  fill 0.4s ease,
-                  stroke 0.4s ease !important;
+      transition: background-color 0.45s ease, color 0.35s ease,
+                  border-color 0.45s ease, box-shadow 0.45s ease,
+                  fill 0.35s ease, stroke 0.35s ease;
     }
 /* 启动引导屏 */
 .splash-screen {
