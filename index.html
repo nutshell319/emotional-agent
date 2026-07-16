@@ -4,6 +4,18 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Warmth</title>
+<!-- 在CSS渲染前同步读取主题，避免深色→浅色闪烁 -->
+<script>
+(function(){
+  try {
+    var raw = localStorage.getItem('emotion-agent:settings');
+    if (raw) {
+      var s = JSON.parse(raw);
+      if (s.theme) document.documentElement.setAttribute('data-theme', s.theme);
+    }
+  } catch(e) {}
+})();
+</script>
 <style>
 /* ========================================
    CSS Reset & Variables
