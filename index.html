@@ -97,6 +97,18 @@ html, body {
   line-height: 1.6;
 }
 
+    /* 主题切换全局过渡动画（仅在手动切换时启用，启动跳过避免闪烁） */
+    html.theme-transitioning,
+    html.theme-transitioning *,
+    html.theme-transitioning *::before,
+    html.theme-transitioning *::after {
+      transition: background-color 0.5s cubic-bezier(0.4, 0, 0.2, 1),
+                  color 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+                  border-color 0.5s cubic-bezier(0.4, 0, 0.2, 1),
+                  box-shadow 0.5s cubic-bezier(0.4, 0, 0.2, 1),
+                  fill 0.4s ease,
+                  stroke 0.4s ease !important;
+    }
 /* 启动引导屏 */
 .splash-screen {
   position: fixed; inset: 0;
@@ -3972,8 +3984,15 @@ const UIController = {
     if (existing) existing.remove();
   },
 
-  /** 应用主题 */
-  _applyTheme(theme) {
+  /** 应用主题。isUserToggle为true时启用全局过渡动画 */
+  _applyTheme(theme, isUserToggle = false) {
+    if (isUserToggle) {
+      document.documentElement.classList.add('theme-transitioning');
+      clearTimeout(this._themeTransitionTimer);
+      this._themeTransitionTimer = setTimeout(() => {
+        document.documentElement.classList.remove('theme-transitioning');
+      }, 600); // 略长于CSS过渡时间，确保动画完整
+    }
     document.documentElement.setAttribute('data-theme', theme);
     const icon = document.querySelector('.theme-icon');
     if (icon) icon.textContent = theme === 'dark' ? '🌙' : '☀️';
@@ -3983,7 +4002,7 @@ const UIController = {
   _toggleTheme() {
     const current = document.documentElement.getAttribute('data-theme') || 'dark';
     const next = current === 'dark' ? 'light' : 'dark';
-    this._applyTheme(next);
+    this._applyTheme(next, true);
     SettingsManager.set('theme', next);
   },
 
