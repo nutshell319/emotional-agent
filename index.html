@@ -2168,7 +2168,7 @@ const UserMemoryManager = {
 
       if (facts.length > 0) {
         this.mergeFacts(facts);
-        this.refineFacts(); // 超过20条时自动提炼合并
+        await this.refineFacts(); // 超过20条时自动提炼合并（必须await，否则UI刷新时拿到的是提炼前的旧数据）
       }
     } catch (_) {
       // 提取失败静默忽略，不影响主流程
